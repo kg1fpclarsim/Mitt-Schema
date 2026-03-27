@@ -1,7 +1,7 @@
 {
   "name": "Schemat",
   "short_name": "Schemat",
-  "start_url": "schemavisare.html",
+  "start_url": "index.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2563eb",
