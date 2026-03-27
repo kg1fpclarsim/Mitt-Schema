@@ -727,14 +727,15 @@
                 renderMyShifts();
             }
         }
-
     </script>
 
-    <!-- FIREBASE SYNC (ENDAST IN-APP NOTISER) -->
+    <!-- FIREBASE SYNC (ENDAST IN-APP NOTISER OCH SMART MINNE) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // NY KOD: Vi importerar de nya verktygen för Offline Caching (Smart Minne)
+        import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, setDoc, deleteDoc, collection, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         const firebaseConfig = {
             apiKey: "AIzaSy" + "AZg6jb_pABy" + "uOzpJjNXhx" + "xLghG1Y85zSg",
@@ -748,7 +749,12 @@
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        const db = getFirestore(app);
+        
+        // NY KOD: Starta databasen med Smart Minne aktiverat
+        const db = initializeFirestore(app, {
+            localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+        });
+        
         const artifactAppId = typeof __app_id !== 'undefined' ? __app_id : 'schemabyggare-app';
 
         async function initAuth() {
