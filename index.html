@@ -151,6 +151,7 @@
         </main>
     </div>
 
+    <!-- Huvudlogik -->
     <script>
         function showUiToast(msg) {
             const toast = document.getElementById('toast');
@@ -205,7 +206,7 @@
         function getSwedishHoliday(dateStr) {
             const d = new Date(dateStr);
             const y = d.getFullYear(); const m = d.getMonth() + 1; const day = d.getDate();
-            const mmdd = `${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const mmdd = String(m).padStart(2, '0') + "-" + String(day).padStart(2, '0');
 
             const fixedHolidays = {
                 '01-01': 'Nyårsdagen', '01-06': 'Trettondedag jul', '05-01': 'Första maj',
@@ -245,7 +246,7 @@
 
         function formatShiftTime(start, end, daySpan) {
             let spanText = daySpan > 0 ? `<span class="text-[10px] text-orange-500 font-bold ml-1 align-top">+${daySpan}d</span>` : '';
-            return `${start} - ${end}${spanText}`;
+            return start + " - " + end + spanText;
         }
 
         window.toggleExpand = function(btn) {
@@ -255,12 +256,12 @@
 
             if (isExpanded) {
                 hiddenSlots.forEach(el => el.classList.add('hidden'));
-                btn.innerText = `+ ${hiddenSlots.length} till`;
+                btn.innerText = "+ " + hiddenSlots.length + " till";
                 btn.classList.replace('bg-gray-100', 'bg-blue-50');
                 btn.classList.replace('text-gray-600', 'text-blue-500');
             } else {
                 hiddenSlots.forEach(el => el.classList.remove('hidden'));
-                btn.innerText = `Dölj`;
+                btn.innerText = "Dölj";
                 btn.classList.replace('bg-blue-50', 'bg-gray-100');
                 btn.classList.replace('text-blue-500', 'text-gray-600');
             }
@@ -316,8 +317,11 @@
 
         function renderIdentityDropdowns() {
             const deptSelect = document.getElementById('id-department');
-            deptSelect.innerHTML = '<option value="">-- Välj avdelning --</option>' + 
-                state.schedules.map(sch => `<option value="${sch.id}">${sch.name}</option>`).join('');
+            let optionsHtml = '<option value="">-- Välj avdelning --</option>';
+            state.schedules.forEach(sch => {
+                optionsHtml += `<option value="${sch.id}">${sch.name}</option>`;
+            });
+            deptSelect.innerHTML = optionsHtml;
         }
 
         function filterIdentityStaff() {
@@ -335,9 +339,12 @@
             const relevantStaff = state.staff.filter(s => s.isActive && s.allowedSchedules.includes(deptId));
             relevantStaff.sort((a,b) => (a.nickname || a.name).localeCompare(b.nickname || b.name));
 
-            staffSelect.innerHTML = '<option value="">-- Välj ditt namn --</option>' + 
-                relevantStaff.map(s => `<option value="${s.id}">${s.nickname || s.name}</option>`).join('');
-                
+            let staffOptions = '<option value="">-- Välj ditt namn --</option>';
+            relevantStaff.forEach(s => {
+                staffOptions += `<option value="${s.id}">${s.nickname || s.name}</option>`;
+            });
+            
+            staffSelect.innerHTML = staffOptions;    
             staffSelect.disabled = false;
             btn.disabled = true;
         }
@@ -374,7 +381,7 @@
             state.published_schedules.forEach(pub => {
                 const val = pub.year * 100 + pub.week;
                 if (val >= threshold) {
-                    weekSet.add(`${pub.year}_${pub.week}`);
+                    weekSet.add(pub.year + "_" + pub.week);
                 }
             });
 
@@ -383,7 +390,7 @@
             const selector = document.getElementById('week-selector');
             
             if (availableWeeks.length === 0) {
-                selector.innerHTML = `<option value="">Inga scheman</option>`;
+                selector.innerHTML = '<option value="">Inga scheman</option>';
                 activeWeekStr = null;
                 document.getElementById('loading-spinner').classList.add('hidden');
                 renderMyShifts();
@@ -391,10 +398,12 @@
                 return;
             }
 
-            selector.innerHTML = availableWeeks.map(wStr => {
+            let weekOptions = '';
+            availableWeeks.forEach(wStr => {
                 const [y, w] = wStr.split('_');
-                return `<option value="${wStr}">V.${w} (${y})</option>`;
-            }).join('');
+                weekOptions += `<option value="${wStr}">V.${w} (${y})</option>`;
+            });
+            selector.innerHTML = weekOptions;
 
             if (!activeWeekStr || !availableWeeks.includes(activeWeekStr)) {
                 activeWeekStr = availableWeeks[0];
@@ -404,7 +413,11 @@
 
             const gridDeptSelect = document.getElementById('grid-department-selector');
             if (gridDeptSelect.options.length <= 0 && state.schedules.length > 0) {
-                gridDeptSelect.innerHTML = state.schedules.map(sch => `<option value="${sch.id}">${sch.name}</option>`).join('');
+                let deptOptions = '';
+                state.schedules.forEach(sch => {
+                    deptOptions += `<option value="${sch.id}">${sch.name}</option>`;
+                });
+                gridDeptSelect.innerHTML = deptOptions;
                 if (myIdentity && state.schedules.some(s => s.id === myIdentity.departmentId)) {
                     gridDeptSelect.value = myIdentity.departmentId;
                 }
@@ -484,7 +497,8 @@
 
             myPasses.sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
 
-            container.innerHTML = myPasses.map(pass => {
+            let shiftsHtml = '';
+            myPasses.forEach(pass => {
                 let dateStr = pass.dateObj.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' });
                 let dayName = daysMap[pass.dayKey];
 
@@ -505,7 +519,7 @@
                     
                 let timeStr = formatShiftTime(pass.startTime, pass.endTime, pass.daySpan);
 
-                return `
+                shiftsHtml += `
                     <div class="bg-white rounded-xl shadow-sm border ${pass.isBorrowed ? 'border-teal-300 border-l-4 border-l-teal-500' : 'border-gray-200 border-l-4 border-l-blue-500'} p-4 transition-all mb-3">
                         <div class="flex justify-between items-start mb-2">
                             <div>
@@ -518,7 +532,8 @@
                         ${borrowedBadge}
                     </div>
                 `;
-            }).join('');
+            });
+            container.innerHTML = shiftsHtml;
         }
 
         function renderGrid() {
@@ -734,7 +749,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         
-        // NY KOD: Vi importerar de nya verktygen för Offline Caching (Smart Minne)
         import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, setDoc, deleteDoc, collection, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         const firebaseConfig = {
@@ -750,7 +764,6 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         
-        // NY KOD: Starta databasen med Smart Minne aktiverat
         const db = initializeFirestore(app, {
             localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
         });
@@ -767,7 +780,7 @@
                 }
             } catch(e) {
                 console.error("Auth error:", e);
-                document.getElementById('loading-spinner').innerHTML = `<p class="text-red-500 font-bold">Kunde inte ansluta till servern.</p>`;
+                document.getElementById('loading-spinner').innerHTML = '<p class="text-red-500 font-bold">Kunde inte ansluta till servern.</p>';
             }
         }
         initAuth();
@@ -825,11 +838,10 @@
                 snapshot.docChanges().forEach((change) => {
                     if (change.type === "added") {
                         const job = change.doc.data();
-                        // Filtrera så vi bara visar notiser som skapats de senaste 60 sekunderna
                         if (Date.now() - job.createdAt < 60000) { 
                             if (myIdentity && job.staffIds.includes(myIdentity.staffId)) {
                                 showUiToast("🔔 " + job.title + " - " + job.body);
-                                updateWeekSelector(); // Uppdatera skärmen med nya tiderna direkt!
+                                updateWeekSelector(); 
                             }
                         }
                     }
