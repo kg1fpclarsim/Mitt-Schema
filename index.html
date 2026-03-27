@@ -867,11 +867,13 @@
 
         window.initFCMToken = async () => {
             try {
-                if (!VAPID_KEY || VAPID_KEY === "BGcc_vflZbYByTEF-7Bn6KjWd5WJ8pHGmHTArSJyK3Qq9e1-vtEZx865gL0EgEAIWGKbic577bW0w-eynrcI0Cg") {
+                if (!VAPID_KEY || VAPID_KEY === "BYT_UT_MOT_DIN_VAPID_NYCKEL") {
+                    showUiToast("VAPID-nyckel saknas i koden! Klistra in den från Firebase.");
                     console.warn("VAPID nyckel saknas.");
                     return;
                 }
 
+                showUiToast("Kopplar upp mot Apple/Google...");
                 const messaging = getMessaging(app);
                 
                 // Registrera vår nya Service Worker-fil
@@ -892,6 +894,9 @@
                     });
                     
                     document.getElementById('notification-prompt').classList.add('hidden');
+                    showUiToast("Allt klart! Din telefon kan nu ta emot notiser.");
+                } else {
+                    showUiToast("Kunde inte skapa en unik nyckel för din telefon.");
                 }
                 
                 // Lyssna på meddelanden när appen är öppen
@@ -902,6 +907,8 @@
 
             } catch (err) {
                 console.error("Fel vid aktivering av notiser:", err);
+                // Om filen firebase-messaging-sw.js saknas, eller om Apple blockerar, visas det här
+                showUiToast("Kunde inte aktivera: " + err.message.substring(0, 50)); 
             }
         };
 
@@ -909,7 +916,6 @@
             try {
                 const permission = await Notification.requestPermission();
                 if (permission === 'granted') {
-                    showUiToast("Notiser är godkända! Konfigurerar...");
                     await window.initFCMToken();
                 } else {
                     showUiToast("Du nekade notiser. Du kan ändra detta i telefonens inställningar.");
