@@ -33,13 +33,13 @@
 </head>
 <body class="h-screen flex flex-col font-sans text-gray-800 relative max-w-4xl mx-auto shadow-xl bg-white sm:border-x sm:border-gray-200">
 
-    <!-- FULLSKÄRMS-NOTIS FÖR UPPDATERINGAR (Ersätter den lilla rutan) -->
+    <!-- FULLSKÄRMS-NOTIS FÖR UPPDATERINGAR -->
     <div id="update-overlay" class="fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-[500] flex items-center justify-center p-6 hidden opacity-0 transition-opacity duration-300">
         <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8 text-center transform scale-95 transition-transform duration-300" id="update-content">
-            <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-blue-50 text-blue-600 mb-6 shadow-inner border border-blue-100">
+            <div id="update-icon-container" class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-blue-50 text-blue-600 mb-6 shadow-inner border border-blue-100">
                 <i class="fa-solid fa-arrows-rotate text-4xl animate-[spin_3s_linear_infinite]"></i>
             </div>
-            <h2 class="text-2xl font-black text-gray-900 mb-2">Schema uppdaterat</h2>
+            <h2 id="update-title" class="text-2xl font-black text-gray-900 mb-2">Schema uppdaterat</h2>
             <p id="update-msg" class="text-gray-500 mb-8 text-sm font-medium leading-relaxed">Det finns ändringar av dina inplanerade pass.</p>
             
             <button id="update-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg rounded-xl py-4 transition-all shadow-lg active:scale-95">
@@ -163,29 +163,49 @@
 
     <!-- Huvudlogik -->
     <script>
-        // NY KOD: Flagga för att lysa upp korten
         let pendingHighlight = false;
 
-        function showUpdateScreen(msg) {
+        function showUpdateScreen(job) {
             const overlay = document.getElementById('update-overlay');
             const content = document.getElementById('update-content');
-            document.getElementById('update-msg').innerText = msg;
+            const titleEl = document.getElementById('update-title');
+            const msgEl = document.getElementById('update-msg');
+            const iconContainer = document.getElementById('update-icon-container');
+            const btnEl = document.getElementById('update-btn');
+
+            titleEl.innerText = job.title;
+            msgEl.innerText = job.body;
+
+            if (job.type === 'new') {
+                iconContainer.className = "inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-50 text-green-600 mb-6 shadow-inner border border-green-100";
+                iconContainer.innerHTML = '<i class="fa-regular fa-calendar-check text-4xl animate-bounce"></i>';
+                btnEl.innerText = "Gå till vecka " + job.week;
+            } else {
+                iconContainer.className = "inline-flex items-center justify-center w-20 h-20 rounded-full bg-blue-50 text-blue-600 mb-6 shadow-inner border border-blue-100";
+                iconContainer.innerHTML = '<i class="fa-solid fa-arrows-rotate text-4xl animate-[spin_3s_linear_infinite]"></i>';
+                btnEl.innerText = "Visa mina ändrade tider";
+            }
             
-            // Visa fullskärmsnotisen (Rullgardinen dras ner)
             overlay.classList.remove('hidden');
-            void overlay.offsetWidth; // Tvinga webbläsaren att rita om för mjuk animation
+            void overlay.offsetWidth; 
             overlay.classList.remove('opacity-0');
             content.classList.remove('scale-95');
             
-            // Vad som händer när man klickar på "Visa mina nya tider"
-            document.getElementById('update-btn').onclick = () => {
-                // Hissa upp rullgardinen
+            btnEl.onclick = () => {
                 overlay.classList.add('opacity-0');
                 content.classList.add('scale-95');
                 setTimeout(() => { overlay.classList.add('hidden'); }, 300);
                 
-                pendingHighlight = true; // Sätt flaggan att vi ska animera passen!
-                updateWeekSelector();    // Rita upp skärmen igen (med glow-effekten)
+                if (job.year && job.week) {
+                    const targetWeekStr = `${job.year}_${job.week}`;
+                    if(availableWeeks.includes(targetWeekStr)) {
+                        activeWeekStr = targetWeekStr;
+                        document.getElementById('week-selector').value = activeWeekStr;
+                    }
+                }
+
+                pendingHighlight = true; 
+                updateWeekSelector();    
             };
         }
 
@@ -526,7 +546,6 @@
 
             myPasses.sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
 
-            // NY KOD: Bestämmer om korten ska blinka/lysa efter kvittering
             let glowClass = pendingHighlight ? 'ring-[3px] ring-green-400 scale-[1.01] shadow-lg transition-all duration-700 ease-out z-10' : 'transition-all duration-300';
 
             let shiftsHtml = '';
@@ -567,13 +586,12 @@
             });
             container.innerHTML = shiftsHtml;
 
-            // NY KOD: Ta bort den gröna markeringen efter 5 sekunder
             if (pendingHighlight) {
                 setTimeout(() => {
                     document.querySelectorAll('.shift-card').forEach(card => {
                         card.classList.remove('ring-[3px]', 'ring-green-400', 'scale-[1.01]', 'shadow-lg', 'z-10');
                     });
-                    pendingHighlight = false; // Nollställ flaggan
+                    pendingHighlight = false;
                 }, 5000);
             }
         }
@@ -613,7 +631,6 @@
 
             const myStaffId = myIdentity ? myIdentity.staffId : null;
 
-            // PRECALCULATE DAY METADATA FOR RED DAYS
             const dayMeta = {};
             order.forEach(day => {
                 let d = new Date(mondayDate); d.setDate(d.getDate() + (order.indexOf(day)));
@@ -630,7 +647,6 @@
                 };
             });
 
-            // NY KOD: Lägg till glow-effekt på rutorna i grid-vyn också om det behövs
             let glowClassGrid = pendingHighlight ? 'ring-[2px] ring-green-400 scale-[1.05] z-10 transition-all duration-700' : '';
 
             const generateCellHtml = (assignments, hc) => {
@@ -650,7 +666,6 @@
                             if (isBorrowed) sName = `🤝 ${sName}`;
                             
                             if (sId === myStaffId) {
-                                // Om detta pass är M립니다s pass och vi har klickat på kvittera: Lägg på den gröna ramen!
                                 styling = `grid-cell-highlight text-blue-900 font-bold border-blue-400 grid-shift-me ${glowClassGrid}`;
                                 isMe = true;
                             } else {
@@ -787,7 +802,6 @@
                 });
             }
 
-            // NY KOD: Rensa highlight även från griden
             if (pendingHighlight) {
                 setTimeout(() => {
                     document.querySelectorAll('.grid-shift-me').forEach(card => {
@@ -835,9 +849,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        
-        // ÄNDRAD KOD: Tog bort 'persistentMultipleTabManager' som fryser iOS
-        import { initializeFirestore, persistentLocalCache, doc, setDoc, deleteDoc, collection, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeFirestore, persistentLocalCache, doc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         const firebaseConfig = {
             apiKey: "AIzaSy" + "AZg6jb_pABy" + "uOzpJjNXhx" + "xLghG1Y85zSg",
@@ -852,14 +864,12 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         
-        // ÄNDRAD KOD: Förenklad cache för att Apple/iOS ska tillåta den
         const db = initializeFirestore(app, {
             localCache: persistentLocalCache()
         });
         
         const artifactAppId = typeof __app_id !== 'undefined' ? __app_id : 'schemabyggare-app';
 
-        // NY KOD: Städa bort spök-arbetare från vårt tidigare push-notis test (nu med felhantering)
         if ('serviceWorker' in navigator) {
             try {
                 navigator.serviceWorker.getRegistrations().then(function(registrations) {
@@ -867,10 +877,10 @@
                         registration.unregister();
                     }
                 }).catch(function(error) {
-                    console.log("Kunde inte avregistrera Service Worker (ofta pga iframe/säkerhetsregler):", error);
+                    console.log("Kunde inte avregistrera Service Worker:", error);
                 });
             } catch (error) {
-                console.log("Service Worker API ej tillgängligt i denna kontext:", error);
+                console.log("Service Worker API ej tillgängligt:", error);
             }
         }
 
@@ -929,7 +939,12 @@
                         checkPinState(); 
                     } else if (initialLoadCount > requiredCollections.length) {
                         if (myIdentity && document.getElementById('pin-screen').classList.contains('hidden')) {
-                            updateWeekSelector(); 
+                            // Vi uppdaterar bara klockan/schemat tyst om vi EJ väntar på kvittering
+                            if (!document.getElementById('update-overlay').classList.contains('hidden')) {
+                                // Användaren kollar på uppdateringsskärmen, pausa!
+                            } else {
+                                updateWeekSelector(); 
+                            }
                         } else if (!myIdentity && document.getElementById('pin-screen').classList.contains('hidden')) {
                             renderIdentityDropdowns();
                         }
@@ -937,15 +952,13 @@
                 });
             });
 
-            // Lyssna på In-App Notiser i realtid (om appen är öppen)
             onSnapshot(collection(db, 'artifacts', artifactAppId, 'public', 'data', 'push_jobs'), (snapshot) => {
                 snapshot.docChanges().forEach((change) => {
                     if (change.type === "added") {
                         const job = change.doc.data();
                         if (Date.now() - job.createdAt < 60000) { 
                             if (myIdentity && job.staffIds.includes(myIdentity.staffId)) {
-                                // Vi visar den nya fullskärms-modalen!
-                                showUpdateScreen("Det finns ändringar av dina inplanerade pass. Klicka nedan för att se hur ditt schema ser ut nu.");
+                                showUpdateScreen(job);
                             }
                         }
                     }
