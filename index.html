@@ -33,20 +33,19 @@
 </head>
 <body class="h-screen flex flex-col font-sans text-gray-800 relative max-w-4xl mx-auto shadow-xl bg-white sm:border-x sm:border-gray-200">
 
-    <!-- Notis-Toast (Bredare, mjukt rektangulär och placerad i botten) -->
-    <div id="toast" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-11/12 max-w-sm bg-gray-900 text-white p-4 rounded-xl shadow-2xl transition-all duration-300 opacity-0 pointer-events-none translate-y-4 z-[400] border border-gray-700 flex flex-col gap-3">
-        <div class="flex items-start">
-            <div class="bg-blue-500/20 p-2 rounded-lg mr-3 text-blue-400 flex-shrink-0">
-                <i class="fa-solid fa-bell text-xl"></i>
+    <!-- FULLSKÄRMS-NOTIS FÖR UPPDATERINGAR (Ersätter den lilla rutan) -->
+    <div id="update-overlay" class="fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-[500] flex items-center justify-center p-6 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8 text-center transform scale-95 transition-transform duration-300" id="update-content">
+            <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-blue-50 text-blue-600 mb-6 shadow-inner border border-blue-100">
+                <i class="fa-solid fa-arrows-rotate text-4xl animate-[spin_3s_linear_infinite]"></i>
             </div>
-            <div>
-                <h3 class="font-bold text-sm">Schema uppdaterat!</h3>
-                <p id="toast-msg" class="text-xs text-gray-300 mt-0.5 leading-snug">Meddelande här</p>
-            </div>
+            <h2 class="text-2xl font-black text-gray-900 mb-2">Schema uppdaterat</h2>
+            <p id="update-msg" class="text-gray-500 mb-8 text-sm font-medium leading-relaxed">Det finns ändringar av dina inplanerade pass.</p>
+            
+            <button id="update-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg rounded-xl py-4 transition-all shadow-lg active:scale-95">
+                Visa mina nya tider
+            </button>
         </div>
-        <button id="toast-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-lg text-sm transition-colors shadow-sm pointer-events-auto active:scale-95">
-            Ladda in nya tider
-        </button>
     </div>
 
     <!-- LÅSSKÄRM (PIN-KOD) -->
@@ -167,18 +166,26 @@
         // NY KOD: Flagga för att lysa upp korten
         let pendingHighlight = false;
 
-        function showUiToast(msg) {
-            const toast = document.getElementById('toast');
-            document.getElementById('toast-msg').innerText = msg;
+        function showUpdateScreen(msg) {
+            const overlay = document.getElementById('update-overlay');
+            const content = document.getElementById('update-content');
+            document.getElementById('update-msg').innerText = msg;
             
-            // Visa notisen
-            toast.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-4');
+            // Visa fullskärmsnotisen (Rullgardinen dras ner)
+            overlay.classList.remove('hidden');
+            void overlay.offsetWidth; // Tvinga webbläsaren att rita om för mjuk animation
+            overlay.classList.remove('opacity-0');
+            content.classList.remove('scale-95');
             
-            // Vad som händer när man klickar på "Ladda in nya tider"
-            document.getElementById('toast-btn').onclick = () => {
-                toast.classList.add('opacity-0', 'pointer-events-none', 'translate-y-4');
+            // Vad som händer när man klickar på "Visa mina nya tider"
+            document.getElementById('update-btn').onclick = () => {
+                // Hissa upp rullgardinen
+                overlay.classList.add('opacity-0');
+                content.classList.add('scale-95');
+                setTimeout(() => { overlay.classList.add('hidden'); }, 300);
+                
                 pendingHighlight = true; // Sätt flaggan att vi ska animera passen!
-                updateWeekSelector();    // Hämta in datan och rita upp skärmen igen
+                updateWeekSelector();    // Rita upp skärmen igen (med glow-effekten)
             };
         }
 
@@ -920,8 +927,8 @@
                         const job = change.doc.data();
                         if (Date.now() - job.createdAt < 60000) { 
                             if (myIdentity && job.staffIds.includes(myIdentity.staffId)) {
-                                // Vi byter ut job.body mot vår anpassade bekräftelse
-                                showUiToast("Det finns ändringar av dina inplanerade pass.");
+                                // Vi visar den nya fullskärms-modalen!
+                                showUpdateScreen("Det finns ändringar av dina inplanerade pass. Klicka nedan för att se hur ditt schema ser ut nu.");
                             }
                         }
                     }
