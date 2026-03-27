@@ -2,8 +2,16 @@
 <html lang="sv">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Mitt Schema</title>
+    
+    <!-- PWA / App Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Schemat">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#2563eb">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -11,7 +19,6 @@
         .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; font-weight: 600; }
         .tab-inactive { color: #6b7280; font-weight: 500; }
         
-        /* Sticky klasser optimerade för kant-i-kant */
         .sticky-col { position: sticky; left: 0; background-color: #f9fafb; z-index: 10; border-right: 2px solid #e5e7eb; }
         .sticky-col-top { position: sticky; top: 0; background-color: #f9fafb; z-index: 11; }
         .sticky-col.sticky-col-top { z-index: 30; } 
@@ -19,11 +26,45 @@
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         
-        /* Mobilvänligt rutnät */
         .grid-cell-highlight { ring: 2px solid #3b82f6; background-color: #eff6ff !important; transform: scale(1.02); z-index: 5; position: relative; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
     </style>
 </head>
 <body class="h-screen flex flex-col font-sans text-gray-800 relative max-w-4xl mx-auto shadow-xl bg-white sm:border-x sm:border-gray-200">
+
+    <!-- INSTALLATIONS-GUIDE (MODAL) -->
+    <div id="install-guide-modal" class="fixed inset-0 bg-gray-900/80 z-[300] flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden transform scale-95 transition-transform duration-300" id="install-guide-content">
+            <div class="bg-indigo-600 p-6 text-white text-center relative">
+                <button onclick="closeInstallGuide()" class="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors"><i class="fa-solid fa-xmark text-lg"></i></button>
+                <i class="fa-solid fa-arrow-down-to-bracket text-5xl mb-3 shadow-sm rounded-xl"></i>
+                <h2 class="text-xl font-bold tracking-wide">Aktivera Notiser</h2>
+            </div>
+            <div class="p-6 bg-gray-50">
+                <p class="text-sm text-gray-600 mb-6 font-medium text-center">För att telefonen ska kunna ta emot notiser när ett nytt schema släpps, måste du installera sidan som en app.</p>
+                
+                <div class="space-y-4">
+                    <!-- iPhone -->
+                    <div class="flex items-start bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+                        <div class="bg-gray-100 text-gray-700 w-10 h-10 rounded-lg flex items-center justify-center mr-3 shrink-0"><i class="fa-brands fa-apple text-2xl"></i></div>
+                        <div>
+                            <h3 class="font-bold text-gray-800 text-sm">iPhone (Safari)</h3>
+                            <p class="text-xs text-gray-600 mt-1 leading-relaxed">Tryck på <i class="fa-solid fa-arrow-up-from-bracket mx-0.5 border border-gray-300 rounded px-1 text-gray-500"></i> i menyn längst ner och välj <strong class="text-gray-800">"Lägg till på hemskärmen"</strong> <i class="fa-regular fa-square-plus mx-0.5 text-gray-500"></i>.</p>
+                        </div>
+                    </div>
+                    <!-- Android -->
+                    <div class="flex items-start bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+                        <div class="bg-gray-100 text-green-600 w-10 h-10 rounded-lg flex items-center justify-center mr-3 shrink-0"><i class="fa-brands fa-android text-2xl"></i></div>
+                        <div>
+                            <h3 class="font-bold text-gray-800 text-sm">Android (Chrome)</h3>
+                            <p class="text-xs text-gray-600 mt-1 leading-relaxed">Tryck på <i class="fa-solid fa-ellipsis-vertical mx-1 text-gray-500"></i> uppe till höger i webbläsaren och välj <strong class="text-gray-800">"Lägg till på startskärmen"</strong>.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <button onclick="closeInstallGuide()" class="w-full mt-6 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded-xl transition-colors shadow-sm">Jag förstår</button>
+            </div>
+        </div>
+    </div>
 
     <!-- LÅSSKÄRM (PIN-KOD) -->
     <div id="pin-screen" class="fixed inset-0 bg-gray-900 z-[200] flex flex-col items-center justify-center p-6 transition-opacity duration-300 hidden">
@@ -78,11 +119,9 @@
     <!-- HUVUDAPP -->
     <div id="main-app" class="flex flex-col h-full hidden">
         
-        <!-- Header (Dynamisk storlek) -->
+        <!-- Header -->
         <header id="main-header" class="bg-blue-600 text-white shadow-md z-20 shrink-0 pb-1 transition-all duration-300">
             <div id="header-top-row" class="px-4 pt-4 pb-2 flex justify-between items-start transition-all duration-300">
-                
-                <!-- Detta område döljs i kompaktläge -->
                 <div id="header-brand-area" class="transition-all duration-300 overflow-hidden transform origin-left">
                     <h1 class="text-xl font-extrabold tracking-tight">Mitt Schema</h1>
                     <div class="text-blue-100 text-sm font-medium flex items-center mt-0.5 cursor-pointer hover:text-white" onclick="resetIdentity()" title="Klicka för att byta person">
@@ -108,8 +147,24 @@
             </div>
         </header>
 
+        <!-- INSTALL-BANNER (Visas bara i webbläsaren) -->
+        <div id="install-banner" class="hidden bg-indigo-50 border-b border-indigo-100 p-3 flex justify-between items-center shrink-0 z-10">
+            <div class="flex items-center">
+                <div class="bg-indigo-100 w-8 h-8 rounded-full flex items-center justify-center text-indigo-600 mr-3 shrink-0">
+                    <i class="fa-solid fa-bell"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-bold text-indigo-900 leading-tight">Missa inga ändringar!</p>
+                    <p class="text-[10px] font-semibold text-indigo-600 uppercase tracking-wide">Installera appen för notiser</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="showInstallGuide()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm transition-colors">Visa hur</button>
+                <button onclick="dismissInstallBanner()" class="text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-200 transition-colors"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+        </div>
+
         <main class="flex-1 overflow-y-auto bg-gray-100 relative">
-            
             <div id="loading-spinner" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 z-50">
                 <i class="fa-solid fa-circle-notch fa-spin text-4xl text-blue-500 mb-3"></i>
                 <p class="text-gray-500 font-medium">Hämtar scheman...</p>
@@ -132,7 +187,6 @@
                     </select>
                 </div>
                 
-                <!-- Minimal padding för att maxa rutnätet. pt-0 gör att thead fastnar direkt under kanten -->
                 <div id="grid-container" class="flex-1 overflow-auto bg-white px-0 sm:px-2 pb-4 pt-0 relative">
                     <table class="min-w-full border-collapse border-0 text-sm">
                         <thead id="grid-thead" class="bg-gray-50"></thead>
@@ -141,7 +195,6 @@
                     <div id="grid-empty-state" class="hidden text-center py-10 text-gray-400 italic">Inga publicerade pass denna vecka.</div>
                 </div>
             </div>
-            
         </main>
     </div>
 
@@ -161,7 +214,44 @@
         let activeWeekStr = null; 
         let availableWeeks = [];
 
-        // --- HJÄLPFUNKTIONER KALENDER ---
+        // --- PWA / INSTALLATIONS-LOGIK ---
+        function checkInstallStatus() {
+            // Kontrollera om appen körs i "Standalone" (Redan tillagd på hemskärmen)
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+            const isDismissed = localStorage.getItem('hide_install_banner') === 'true';
+
+            if (!isStandalone && !isDismissed) {
+                // Användaren surfar i webbläsaren, visa bannern!
+                document.getElementById('install-banner').classList.remove('hidden');
+            }
+        }
+
+        function dismissInstallBanner() {
+            localStorage.setItem('hide_install_banner', 'true');
+            document.getElementById('install-banner').classList.add('hidden');
+        }
+
+        function showInstallGuide() {
+            const modal = document.getElementById('install-guide-modal');
+            const content = document.getElementById('install-guide-content');
+            modal.classList.remove('hidden');
+            // Tvinga webbläsaren att rita om innan vi ändrar opacity (för animationen)
+            void modal.offsetWidth;
+            modal.classList.remove('opacity-0');
+            content.classList.remove('scale-95');
+        }
+
+        function closeInstallGuide() {
+            const modal = document.getElementById('install-guide-modal');
+            const content = document.getElementById('install-guide-content');
+            modal.classList.add('opacity-0');
+            content.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        // --- KALENDER & HELGDAGAR ---
         function getWeekNumber(d) {
             d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
             d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
@@ -178,13 +268,52 @@
             return ISOweekStart;
         }
 
-        // Datumuträknare som hanterar söndagar (och tillhörande vecko-avvikelser)
         function getDateForDay(mondayDate, day, weekStart) {
             let dayOffset = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].indexOf(day);
-            if (weekStart === 'sun' && day === 'sun') dayOffset = -1; // Flyttar Söndagen till att vara dagen INNAN ISO-måndagen
+            if (weekStart === 'sun' && day === 'sun') dayOffset = -1; 
             let d = new Date(mondayDate);
             d.setDate(mondayDate.getDate() + dayOffset);
             return d;
+        }
+
+        function calculateEaster(year) {
+            const a = year % 19; const b = Math.floor(year / 100); const c = year % 100;
+            const d = Math.floor(b / 4); const e = b % 4; const f = Math.floor((b + 8) / 25);
+            const g = Math.floor((b - f + 1) / 3); const h = (19 * a + b - d - g + 15) % 30;
+            const i = Math.floor(c / 4); const k = c % 4; const l = (32 + 2 * e + 2 * i - h - k) % 7;
+            const m = Math.floor((a + 11 * h + 22 * l) / 451);
+            const month = Math.floor((h + l - 7 * m + 114) / 31);
+            const day = ((h + l - 7 * m + 114) % 31) + 1;
+            return new Date(year, month - 1, day);
+        }
+
+        function getSwedishHoliday(dateStr) {
+            const d = new Date(dateStr);
+            const y = d.getFullYear(); const m = d.getMonth() + 1; const day = d.getDate();
+            const mmdd = `${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+            const fixedHolidays = {
+                '01-01': 'Nyårsdagen', '01-06': 'Trettondedag jul', '05-01': 'Första maj',
+                '06-06': 'Nationaldagen', '12-24': 'Julafton', '12-25': 'Juldagen',
+                '12-26': 'Annandag jul', '12-31': 'Nyårsafton'
+            };
+            if (fixedHolidays[mmdd]) return fixedHolidays[mmdd];
+
+            if (m === 6) {
+                if (d.getDay() === 5 && day >= 19 && day <= 25) return 'Midsommarafton';
+                if (d.getDay() === 6 && day >= 20 && day <= 26) return 'Midsommardagen';
+            }
+            if ((m === 10 && day === 31 && d.getDay() === 6) || (m === 11 && day <= 6 && d.getDay() === 6)) { return 'Alla helgons dag'; }
+
+            const easter = calculateEaster(y);
+            const diffDays = Math.round((d.getTime() - easter.getTime()) / (1000 * 60 * 60 * 24));
+
+            switch(diffDays) {
+                case -2: return 'Långfredagen'; case -1: return 'Påskafton'; case 0: return 'Påskdagen';
+                case 1: return 'Annandag påsk'; case 39: return 'Kristi himmelsfärdsdag';
+                case 48: return 'Pingstafton'; case 49: return 'Pingstdagen';
+            }
+            return null; 
         }
 
         function calculateNeedHours(startTime, endTime, breakHours, daySpan) {
@@ -204,7 +333,6 @@
             return `${start} - ${end}${spanText}`;
         }
 
-        // --- EXPANDERING FÖR LÅNGA LISTOR ---
         window.toggleExpand = function(btn) {
             const container = btn.parentElement;
             const hiddenSlots = container.querySelectorAll('.hidden-slot');
@@ -223,7 +351,7 @@
             }
         };
 
-        // --- SÄKERHET (PIN-KOD) ---
+        // --- SÄKERHET OCH IDENTITET ---
         function checkPinState() {
             const requiredPin = state.settings.viewerPin;
             const savedPin = localStorage.getItem('schemavisare_pin');
@@ -232,6 +360,7 @@
                 document.getElementById('pin-screen').classList.remove('hidden');
                 document.getElementById('identity-screen').classList.add('hidden');
                 document.getElementById('main-app').classList.add('hidden');
+                document.getElementById('install-banner').classList.add('hidden'); // Dölj banner om skärmen är låst
             } else {
                 document.getElementById('pin-screen').classList.add('hidden');
                 checkIdentityState();
@@ -254,11 +383,11 @@
             }
         }
 
-        // --- IDENTITET (VEM ÄR DU) ---
         function checkIdentityState() {
             if (!myIdentity) {
                 document.getElementById('identity-screen').classList.remove('hidden');
                 document.getElementById('main-app').classList.add('hidden');
+                document.getElementById('install-banner').classList.add('hidden');
                 renderIdentityDropdowns();
             } else {
                 document.getElementById('identity-screen').classList.add('hidden');
@@ -270,6 +399,7 @@
                 }
                 
                 updateWeekSelector();
+                checkInstallStatus(); // Visa installationsbannern här om den behövs
             }
         }
 
@@ -319,8 +449,6 @@
         function resetIdentity() {
             myIdentity = null;
             localStorage.removeItem('schemavisare_user');
-            
-            // Fäll ut headern igen ifall vi loggade ut från grid-vyn
             switchTab('tab-my-shifts');
             checkIdentityState();
         }
@@ -417,13 +545,11 @@
                             const timesAssigned = assignments[day].filter(id => id === myStaffId).length;
                             if (timesAssigned > 0) {
                                 const h = calculateNeedHours(needMeta.startTime, needMeta.endTime, needMeta.breakHours, needMeta.daySpan) * timesAssigned;
-                                
-                                // NY KOD: Räkna ut exakt vilket datum detta pass hamnar på
                                 const passDate = getDateForDay(mondayDate, day, passWeekStart);
                                 
                                 myPasses.push({
                                     dayKey: day,
-                                    dateObj: passDate, // Sparar det riktiga datum-objektet
+                                    dateObj: passDate, 
                                     title: needMeta.title,
                                     startTime: needMeta.startTime,
                                     endTime: needMeta.endTime,
@@ -447,14 +573,12 @@
                 return;
             }
 
-            // NY KOD: Sortera listan kronologiskt baserat på faktiskt datum (inte veckodagens namn)
             myPasses.sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
 
             container.innerHTML = myPasses.map(pass => {
                 let dateStr = pass.dateObj.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' });
                 let dayName = daysMap[pass.dayKey];
 
-                // --- NY KOD: Kontrollera helgdagar och röda dagar ---
                 let y = pass.dateObj.getFullYear();
                 let m = String(pass.dateObj.getMonth() + 1).padStart(2, '0');
                 let d = String(pass.dateObj.getDate()).padStart(2, '0');
@@ -465,7 +589,6 @@
                 
                 let dayColorClass = isRedDay ? 'text-red-600' : 'text-gray-800';
                 let holidayTag = holiday ? `<div class="text-[10px] text-red-600 font-extrabold mt-0.5 uppercase tracking-wider">${holiday}</div>` : '';
-                // --- SLUT NY KOD ---
 
                 let borrowedBadge = pass.isBorrowed 
                     ? `<div class="mt-2 text-xs font-bold text-teal-700 bg-teal-50 inline-block px-2 py-1 rounded border border-teal-200"><i class="fa-solid fa-handshake mr-1"></i> Utlånad till: ${pass.schName}</div>` 
@@ -489,7 +612,7 @@
             }).join('');
         }
 
-        // --- FLIK 2: HELA SCHEMAT (RUTNÄT) MED SMART SORTERING ---
+        // --- FLIK 2: HELA SCHEMAT ---
         function renderGrid() {
             const deptId = document.getElementById('grid-department-selector').value;
             const thead = document.getElementById('grid-thead');
@@ -525,14 +648,12 @@
 
             const myStaffId = myIdentity ? myIdentity.staffId : null;
 
-            // Hjälpfunktion: Sorterar listan av namn (Jag först, sen kollegor, sist tomma platser) 
-            // och gör alla namn i normal grå text.
             const generateCellHtml = (assignments, hc) => {
                 let displayList = [];
                 for(let i = 0; i < hc; i++) {
                     const sId = assignments[i];
                     let sName = "-";
-                    let styling = "bg-gray-50 text-gray-400 border-gray-200"; // Tomma platser
+                    let styling = "bg-gray-50 text-gray-400 border-gray-200"; 
                     let isMe = false;
                     let isEmpty = !sId;
                     
@@ -547,7 +668,7 @@
                                 styling = "grid-cell-highlight text-blue-900 font-bold border-blue-400";
                                 isMe = true;
                             } else {
-                                styling = "bg-white text-gray-800 border-gray-300 shadow-sm"; // Normal läsbar text för kollegor
+                                styling = "bg-white text-gray-800 border-gray-300 shadow-sm"; 
                             }
                         } else {
                             sName = "Borttagen";
@@ -556,7 +677,6 @@
                     displayList.push({ sName, styling, isMe, isEmpty });
                 }
 
-                // Sortering
                 displayList.sort((a, b) => {
                     if (a.isMe && !b.isMe) return -1;
                     if (!a.isMe && b.isMe) return 1;
@@ -581,7 +701,6 @@
                 html += `</div>`;
                 return html;
             };
-
 
             if (layout === 'transposed') {
                 let trHead = document.createElement('tr');
@@ -626,7 +745,6 @@
                 });
 
             } else {
-                // Layout: Standard (Dagar nedåt)
                 let trHead = document.createElement('tr');
                 trHead.innerHTML = `<th class="px-3 py-2 text-left font-bold sticky-col sticky-col-top bg-gray-100 w-24 border-b-2 border-r-2 border-gray-200">Dag</th>`;
                 
@@ -684,20 +802,17 @@
             activeBtn.classList.remove('border-transparent', 'text-blue-200');
             activeBtn.classList.add('border-white', 'text-white');
 
-            // Logik för att minimera headern
             const brandArea = document.getElementById('header-brand-area');
             const weekLabel = document.getElementById('week-label');
             const topRow = document.getElementById('header-top-row');
 
             if (tabId === 'tab-grid') {
-                // Kompaktläge (Dölj titel och namn)
                 brandArea.classList.add('hidden');
                 weekLabel.classList.add('hidden');
                 topRow.classList.replace('pt-4', 'pt-2');
                 topRow.classList.replace('pb-2', 'pb-1');
                 renderGrid();
             } else {
-                // Standardläge (Visa allt)
                 brandArea.classList.remove('hidden');
                 weekLabel.classList.remove('hidden');
                 topRow.classList.replace('pt-2', 'pt-4');
