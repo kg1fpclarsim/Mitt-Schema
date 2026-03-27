@@ -6,11 +6,13 @@
     <title>Mitt Schema</title>
     
     <!-- PWA / App Meta Tags -->
+    <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Schemat">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#2563eb">
+    <link rel="apple-touch-icon" href="ikon.png">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -31,6 +33,11 @@
 </head>
 <body class="h-screen flex flex-col font-sans text-gray-800 relative max-w-4xl mx-auto shadow-xl bg-white sm:border-x sm:border-gray-200">
 
+    <!-- Notis-Toast -->
+    <div id="toast" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-full shadow-xl transition-opacity duration-300 opacity-0 pointer-events-none z-[400] text-sm font-bold flex items-center">
+        <i class="fa-solid fa-circle-info mr-2 text-blue-400"></i> <span id="toast-msg">Meddelande</span>
+    </div>
+
     <!-- INSTALLATIONS-GUIDE (MODAL) -->
     <div id="install-guide-modal" class="fixed inset-0 bg-gray-900/80 z-[300] flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
         <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden transform scale-95 transition-transform duration-300" id="install-guide-content">
@@ -43,7 +50,6 @@
                 <p class="text-sm text-gray-600 mb-6 font-medium text-center">För att telefonen ska kunna ta emot notiser när ett nytt schema släpps, måste du installera sidan som en app.</p>
                 
                 <div class="space-y-4">
-                    <!-- iPhone -->
                     <div class="flex items-start bg-white p-3 rounded-xl shadow-sm border border-gray-100">
                         <div class="bg-gray-100 text-gray-700 w-10 h-10 rounded-lg flex items-center justify-center mr-3 shrink-0"><i class="fa-brands fa-apple text-2xl"></i></div>
                         <div>
@@ -51,7 +57,6 @@
                             <p class="text-xs text-gray-600 mt-1 leading-relaxed">Tryck på <i class="fa-solid fa-arrow-up-from-bracket mx-0.5 border border-gray-300 rounded px-1 text-gray-500"></i> i menyn längst ner och välj <strong class="text-gray-800">"Lägg till på hemskärmen"</strong> <i class="fa-regular fa-square-plus mx-0.5 text-gray-500"></i>.</p>
                         </div>
                     </div>
-                    <!-- Android -->
                     <div class="flex items-start bg-white p-3 rounded-xl shadow-sm border border-gray-100">
                         <div class="bg-gray-100 text-green-600 w-10 h-10 rounded-lg flex items-center justify-center mr-3 shrink-0"><i class="fa-brands fa-android text-2xl"></i></div>
                         <div>
@@ -119,7 +124,6 @@
     <!-- HUVUDAPP -->
     <div id="main-app" class="flex flex-col h-full hidden">
         
-        <!-- Header -->
         <header id="main-header" class="bg-blue-600 text-white shadow-md z-20 shrink-0 pb-1 transition-all duration-300">
             <div id="header-top-row" class="px-4 pt-4 pb-2 flex justify-between items-start transition-all duration-300">
                 <div id="header-brand-area" class="transition-all duration-300 overflow-hidden transform origin-left">
@@ -147,7 +151,6 @@
             </div>
         </header>
 
-        <!-- INSTALL-BANNER (Visas bara i webbläsaren) -->
         <div id="install-banner" class="hidden bg-indigo-50 border-b border-indigo-100 p-3 flex justify-between items-center shrink-0 z-10">
             <div class="flex items-center">
                 <div class="bg-indigo-100 w-8 h-8 rounded-full flex items-center justify-center text-indigo-600 mr-3 shrink-0">
@@ -172,6 +175,18 @@
 
             <!-- FLIK 1: MINA PASS -->
             <div id="tab-my-shifts" class="p-4 pb-20">
+                
+                <!-- NY KOD: Notis-aktiverare i appen -->
+                <div id="notification-prompt" class="hidden mb-5 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-4 text-white shadow-lg flex items-center justify-between">
+                    <div>
+                        <h3 class="font-bold text-sm">Aktivera Notiser</h3>
+                        <p class="text-xs text-blue-100 mt-0.5">Få ett pling när schemat ändras.</p>
+                    </div>
+                    <button onclick="requestPushPermissions()" class="bg-white text-indigo-600 px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-blue-50 transition-colors shrink-0 ml-3">
+                        Slå på
+                    </button>
+                </div>
+
                 <h2 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3 ml-1">Dina inplanerade tider</h2>
                 <div id="my-shifts-list" class="space-y-3">
                     <!-- Kort laddas hit -->
@@ -183,7 +198,6 @@
                 <div class="bg-white p-2 sm:p-3 border-b border-gray-200 shadow-sm shrink-0 z-30 flex items-center justify-between gap-2">
                     <label class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase shrink-0">Avdelning:</label>
                     <select id="grid-department-selector" onchange="renderGrid()" class="flex-1 border border-gray-300 rounded-lg p-1.5 sm:p-2 text-sm font-bold bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 text-ellipsis">
-                        <!-- Laddas dynamiskt -->
                     </select>
                 </div>
                 
@@ -198,31 +212,39 @@
         </main>
     </div>
 
-    <!-- Data & Logik -->
     <script>
+        function showUiToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            toast.classList.remove('opacity-0');
+            setTimeout(() => toast.classList.add('opacity-0'), 4000);
+        }
+
         const daysMap = { 'mon': 'Måndag', 'tue': 'Tisdag', 'wed': 'Onsdag', 'thu': 'Torsdag', 'fri': 'Fredag', 'sat': 'Lördag', 'sun': 'Söndag' };
         
-        let state = {
-            settings: {}, 
-            schedules: [],
-            staff: [],
-            needs: [],
-            published_schedules: []
-        };
+        let state = { settings: {}, schedules: [], staff: [], needs: [], published_schedules: [] };
 
         let myIdentity = JSON.parse(localStorage.getItem('schemavisare_user')) || null;
         let activeWeekStr = null; 
         let availableWeeks = [];
 
-        // --- PWA / INSTALLATIONS-LOGIK ---
         function checkInstallStatus() {
-            // Kontrollera om appen körs i "Standalone" (Redan tillagd på hemskärmen)
             const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
             const isDismissed = localStorage.getItem('hide_install_banner') === 'true';
 
             if (!isStandalone && !isDismissed) {
-                // Användaren surfar i webbläsaren, visa bannern!
                 document.getElementById('install-banner').classList.remove('hidden');
+            }
+            
+            // Kolla om appen är installerad (eller Android webbläsare) och notiser stöds
+            if ('Notification' in window && !isDismissed) {
+                if (Notification.permission === 'default') {
+                    // Om de installerat appen, visa slå-på knappen inuti appen
+                    if (isStandalone) document.getElementById('notification-prompt').classList.remove('hidden');
+                } else if (Notification.permission === 'granted') {
+                    // Starta prenumeration i bakgrunden
+                    if(window.initFCMToken) window.initFCMToken();
+                }
             }
         }
 
@@ -235,7 +257,6 @@
             const modal = document.getElementById('install-guide-modal');
             const content = document.getElementById('install-guide-content');
             modal.classList.remove('hidden');
-            // Tvinga webbläsaren att rita om innan vi ändrar opacity (för animationen)
             void modal.offsetWidth;
             modal.classList.remove('opacity-0');
             content.classList.remove('scale-95');
@@ -246,12 +267,9 @@
             const content = document.getElementById('install-guide-content');
             modal.classList.add('opacity-0');
             content.classList.add('scale-95');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-            }, 300);
+            setTimeout(() => modal.classList.add('hidden'), 300);
         }
 
-        // --- KALENDER & HELGDAGAR ---
         function getWeekNumber(d) {
             d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
             d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
@@ -351,7 +369,6 @@
             }
         };
 
-        // --- SÄKERHET OCH IDENTITET ---
         function checkPinState() {
             const requiredPin = state.settings.viewerPin;
             const savedPin = localStorage.getItem('schemavisare_pin');
@@ -360,7 +377,7 @@
                 document.getElementById('pin-screen').classList.remove('hidden');
                 document.getElementById('identity-screen').classList.add('hidden');
                 document.getElementById('main-app').classList.add('hidden');
-                document.getElementById('install-banner').classList.add('hidden'); // Dölj banner om skärmen är låst
+                document.getElementById('install-banner').classList.add('hidden');
             } else {
                 document.getElementById('pin-screen').classList.add('hidden');
                 checkIdentityState();
@@ -399,7 +416,7 @@
                 }
                 
                 updateWeekSelector();
-                checkInstallStatus(); // Visa installationsbannern här om den behövs
+                checkInstallStatus();
             }
         }
 
@@ -453,7 +470,6 @@
             checkIdentityState();
         }
 
-        // --- VECKOR OCH DATA ---
         function updateWeekSelector() {
             const today = new Date();
             const currentWk = getWeekNumber(today);
@@ -513,7 +529,6 @@
             renderGrid();
         }
 
-        // --- FLIK 1: MINA PASS ---
         function renderMyShifts() {
             const container = document.getElementById('my-shifts-list');
             
@@ -597,7 +612,7 @@
                 let timeStr = formatShiftTime(pass.startTime, pass.endTime, pass.daySpan);
 
                 return `
-                    <div class="bg-white rounded-xl shadow-sm border ${pass.isBorrowed ? 'border-teal-300 border-l-4 border-l-teal-500' : 'border-gray-200 border-l-4 border-l-blue-500'} p-4 transition-all">
+                    <div class="bg-white rounded-xl shadow-sm border ${pass.isBorrowed ? 'border-teal-300 border-l-4 border-l-teal-500' : 'border-gray-200 border-l-4 border-l-blue-500'} p-4 transition-all mb-3">
                         <div class="flex justify-between items-start mb-2">
                             <div>
                                 <div class="font-black ${dayColorClass} text-sm tracking-wide uppercase">${dayName} <span class="text-gray-400 ml-1 font-semibold">${dateStr}</span></div>
@@ -612,7 +627,6 @@
             }).join('');
         }
 
-        // --- FLIK 2: HELA SCHEMAT ---
         function renderGrid() {
             const deptId = document.getElementById('grid-department-selector').value;
             const thead = document.getElementById('grid-thead');
@@ -788,7 +802,6 @@
             }
         }
 
-        // --- FLIK-HANTERING OCH KOMPAKTLÄGE ---
         function switchTab(tabId) {
             ['tab-my-shifts', 'tab-grid'].forEach(id => {
                 document.getElementById(id).classList.add('hidden');
@@ -823,11 +836,14 @@
 
     </script>
 
-    <!-- FIREBASE SYNC LOGIC -->
+    <!-- FIREBASE SYNC & PUSH NOTIFICATIONS -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // NY KOD: Importera Messaging (Notiser)
+        import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-messaging.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSy" + "AZg6jb_pABy" + "uOzpJjNXhx" + "xLghG1Y85zSg",
@@ -843,6 +859,67 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
         const artifactAppId = typeof __app_id !== 'undefined' ? __app_id : 'schemabyggare-app';
+
+        // --- NY KOD: NOTIS-LOGIK ---
+        
+        // Klistra in din VAPID-nyckel från Firebase här!
+        const VAPID_KEY = "BGcc_vflZbYByTEF-7Bn6KjWd5WJ8pHGmHTArSJyK3Qq9e1-vtEZx865gL0EgEAIWGKbic577bW0w-eynrcI0Cg"; 
+
+        window.initFCMToken = async () => {
+            try {
+                if (!VAPID_KEY || VAPID_KEY === "BGcc_vflZbYByTEF-7Bn6KjWd5WJ8pHGmHTArSJyK3Qq9e1-vtEZx865gL0EgEAIWGKbic577bW0w-eynrcI0Cg") {
+                    console.warn("VAPID nyckel saknas.");
+                    return;
+                }
+
+                const messaging = getMessaging(app);
+                
+                // Registrera vår nya Service Worker-fil
+                const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                
+                // Hämta den unika adresslappen
+                const currentToken = await getToken(messaging, { 
+                    vapidKey: VAPID_KEY,
+                    serviceWorkerRegistration: registration
+                });
+                
+                if (currentToken && myIdentity) {
+                    // Spara adresslappen i databasen under denna chaufförs namn
+                    await setDoc(doc(db, 'artifacts', artifactAppId, 'public', 'data', 'notification_tokens', currentToken), {
+                        token: currentToken,
+                        staffId: myIdentity.staffId,
+                        updatedAt: Date.now()
+                    });
+                    
+                    document.getElementById('notification-prompt').classList.add('hidden');
+                }
+                
+                // Lyssna på meddelanden när appen är öppen
+                onMessage(messaging, (payload) => {
+                    console.log('Meddelande mottaget i förgrunden:', payload);
+                    showUiToast(payload.notification.title + " - " + payload.notification.body);
+                });
+
+            } catch (err) {
+                console.error("Fel vid aktivering av notiser:", err);
+            }
+        };
+
+        window.requestPushPermissions = async () => {
+            try {
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    showUiToast("Notiser är godkända! Konfigurerar...");
+                    await window.initFCMToken();
+                } else {
+                    showUiToast("Du nekade notiser. Du kan ändra detta i telefonens inställningar.");
+                }
+            } catch (error) {
+                console.error('Fel vid förfrågan om notiser:', error);
+                showUiToast("Ett fel uppstod när notiser skulle aktiveras.");
+            }
+        };
+        // --- SLUT NOTIS-LOGIK ---
 
         async function initAuth() {
             try {
@@ -897,12 +974,6 @@
                     initialLoadCount++;
                     if (initialLoadCount === requiredCollections.length) {
                         checkPinState(); 
-                        
-                        const indicator = document.getElementById('live-indicator');
-                        if (indicator && indicator.innerHTML.includes('Offline')) {
-                            indicator.className = "ml-3 px-2 py-0.5 bg-green-500 text-white text-[10px] font-bold rounded shadow-sm transition-colors";
-                            indicator.innerHTML = '<i class="fa-solid fa-cloud"></i> Synkad';
-                        }
                     } else if (initialLoadCount > requiredCollections.length) {
                         if (myIdentity && document.getElementById('pin-screen').classList.contains('hidden')) {
                             updateWeekSelector(); 
@@ -910,8 +981,6 @@
                             renderIdentityDropdowns();
                         }
                     }
-                }, (error) => {
-                    console.error(`Error reading ${colName}:`, error);
                 });
             });
         });
