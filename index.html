@@ -836,7 +836,8 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         
-        import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, setDoc, deleteDoc, collection, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // ÄNDRAD KOD: Tog bort 'persistentMultipleTabManager' som fryser iOS
+        import { initializeFirestore, persistentLocalCache, doc, setDoc, deleteDoc, collection, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         const firebaseConfig = {
             apiKey: "AIzaSy" + "AZg6jb_pABy" + "uOzpJjNXhx" + "xLghG1Y85zSg",
@@ -851,11 +852,27 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         
+        // ÄNDRAD KOD: Förenklad cache för att Apple/iOS ska tillåta den
         const db = initializeFirestore(app, {
-            localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+            localCache: persistentLocalCache()
         });
         
         const artifactAppId = typeof __app_id !== 'undefined' ? __app_id : 'schemabyggare-app';
+
+        // NY KOD: Städa bort spök-arbetare från vårt tidigare push-notis test (nu med felhantering)
+        if ('serviceWorker' in navigator) {
+            try {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for(let registration of registrations) {
+                        registration.unregister();
+                    }
+                }).catch(function(error) {
+                    console.log("Kunde inte avregistrera Service Worker (ofta pga iframe/säkerhetsregler):", error);
+                });
+            } catch (error) {
+                console.log("Service Worker API ej tillgängligt i denna kontext:", error);
+            }
+        }
 
         async function initAuth() {
             try {
