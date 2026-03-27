@@ -920,9 +920,8 @@
                         const job = change.doc.data();
                         if (Date.now() - job.createdAt < 60000) { 
                             if (myIdentity && job.staffIds.includes(myIdentity.staffId)) {
-                                // NY KOD: Vi uppdaterar inte skärmen automatiskt längre.
-                                // Vi visar bara rutan, och väntar på kvitteringen!
-                                showUiToast(job.body);
+                                // Vi byter ut job.body mot vår anpassade bekräftelse
+                                showUiToast("Det finns ändringar av dina inplanerade pass.");
                             }
                         }
                     }
