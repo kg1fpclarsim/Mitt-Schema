@@ -454,6 +454,19 @@
                 let dateStr = pass.dateObj.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' });
                 let dayName = daysMap[pass.dayKey];
 
+                // --- NY KOD: Kontrollera helgdagar och röda dagar ---
+                let y = pass.dateObj.getFullYear();
+                let m = String(pass.dateObj.getMonth() + 1).padStart(2, '0');
+                let d = String(pass.dateObj.getDate()).padStart(2, '0');
+                let isoDateStr = `${y}-${m}-${d}`;
+                
+                let holiday = getSwedishHoliday(isoDateStr);
+                let isRedDay = holiday || pass.dayKey === 'sun';
+                
+                let dayColorClass = isRedDay ? 'text-red-600' : 'text-gray-800';
+                let holidayTag = holiday ? `<div class="text-[10px] text-red-600 font-extrabold mt-0.5 uppercase tracking-wider">${holiday}</div>` : '';
+                // --- SLUT NY KOD ---
+
                 let borrowedBadge = pass.isBorrowed 
                     ? `<div class="mt-2 text-xs font-bold text-teal-700 bg-teal-50 inline-block px-2 py-1 rounded border border-teal-200"><i class="fa-solid fa-handshake mr-1"></i> Utlånad till: ${pass.schName}</div>` 
                     : '';
@@ -463,8 +476,11 @@
                 return `
                     <div class="bg-white rounded-xl shadow-sm border ${pass.isBorrowed ? 'border-teal-300 border-l-4 border-l-teal-500' : 'border-gray-200 border-l-4 border-l-blue-500'} p-4 transition-all">
                         <div class="flex justify-between items-start mb-2">
-                            <div class="font-black text-gray-800 text-sm tracking-wide uppercase">${dayName} <span class="text-gray-400 ml-1 font-semibold">${dateStr}</span></div>
-                            <div class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded text-sm tracking-tight"><i class="fa-regular fa-clock mr-1 opacity-70"></i> ${timeStr}</div>
+                            <div>
+                                <div class="font-black ${dayColorClass} text-sm tracking-wide uppercase">${dayName} <span class="text-gray-400 ml-1 font-semibold">${dateStr}</span></div>
+                                ${holidayTag}
+                            </div>
+                            <div class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded text-sm tracking-tight shrink-0 ml-2"><i class="fa-regular fa-clock mr-1 opacity-70"></i> ${timeStr}</div>
                         </div>
                         <h3 class="text-lg font-bold text-gray-900 leading-tight">${pass.title}</h3>
                         ${borrowedBadge}
