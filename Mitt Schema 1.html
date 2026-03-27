@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mitt Schema</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f3f4f6; -webkit-tap-highlight-color: transparent; }
+        .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; font-weight: 600; }
+        .tab-inactive { color: #6b7280; font-weight: 500; }
+        .sticky-col { position: sticky; left: 0; background-color: #f9fafb; z-index: 10; border-right: 2px solid #e5e7eb; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Mobilvänligt rutnät */
+        .grid-cell-dimmed { opacity: 0.4; filter: grayscale(50%); transition: opacity 0.2s; }
+        .grid-cell-highlight { ring: 2px solid #3b82f6; background-color: #eff6ff !important; transform: scale(1.02); z-index: 5; position: relative; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body class="h-screen flex flex-col font-sans text-gray-800 relative max-w-4xl mx-auto shadow-xl bg-white sm:border-x sm:border-gray-200">
+
+    <!-- NY KOD: LÅSSKÄRM (PIN-KOD) -->
+    <div id="pin-screen" class="fixed inset-0 bg-gray-900 z-[200] flex flex-col items-center justify-center p-6 transition-opacity duration-300 hidden">
+        <div class="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-8 text-center">
+            <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-red-50 text-red-600 mb-6">
+                <i class="fa-solid fa-lock text-3xl"></i>
+            </div>
+            <h1 class="text-2xl font-black text-gray-900 mb-2">Låst Schema</h1>
+            <p class="text-gray-500 mb-8 text-sm font-medium">Ange företagets inloggningskod för att kunna se planeringen.</p>
+            
+            <input type="password" id="pin-input" onkeydown="if(event.key === 'Enter') verifyPin()" class="w-full border-2 border-gray-200 rounded-xl p-4 text-center text-3xl tracking-[0.5em] font-black mb-4 focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all" placeholder="••••">
+            
+            <p id="pin-error" class="text-red-500 text-sm font-bold mb-4 hidden bg-red-50 p-2 rounded-lg">Fel kod, försök igen.</p>
+            
+            <button onclick="verifyPin()" class="w-full bg-gray-900 text-white font-bold text-lg rounded-xl py-4 hover:bg-black transition-colors shadow-lg active:scale-95">Lås upp</button>
+        </div>
+    </div>
+    <!-- SLUT NY KOD -->
+
+    <div id="identity-screen" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center p-6 transition-opacity duration-300 hidden">
+        <div class="w-full max-w-sm">
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 text-blue-600 mb-4">
+                    <i class="fa-solid fa-user-check text-2xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-900">Välkommen!</h1>
+                <p class="text-gray-500 mt-2">Vem är du? Välj ditt namn för att se ditt schema.</p>
+            </div>
+
+            <div class="space-y-5">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">1. Vilken är din hem-avdelning?</label>
+                    <select id="id-department" onchange="filterIdentityStaff()" class="w-full border-2 border-gray-300 rounded-xl p-3 text-base bg-gray-50 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        <option value="">-- Välj avdelning --</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">2. Vad heter du?</label>
+                    <select id="id-staff" disabled onchange="checkIdentityReady()" class="w-full border-2 border-gray-300 rounded-xl p-3 text-base bg-gray-50 focus:ring-blue-500 focus:border-blue-500 outline-none disabled:opacity-50">
+                        <option value="">-- Välj avdelning först --</option>
+                    </select>
+                </div>
+
+                <button id="btn-save-identity" disabled onclick="saveIdentity()" class="w-full bg-blue-600 text-white font-bold text-lg rounded-xl py-3.5 mt-4 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors shadow-md">
+                    Visa mitt schema
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="main-app" class="flex flex-col h-full hidden">
+        <header class="bg-blue-600 text-white shadow-md z-20 shrink-0 pb-1">
+            <div class="px-4 pt-4 pb-2 flex justify-between items-center">
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-tight">Mitt Schema</h1>
+                    <div id="user-greeting" class="text-blue-100 text-sm font-medium flex items-center mt-0.5" onclick="resetIdentity()">
+                        <i class="fa-solid fa-user text-xs mr-1.5 opacity-80"></i> <span id="user-name-display" class="underline decoration-blue-400 underline-offset-2">Laddar...</span>
+                    </div>
+                </div>
+                
+                <div class="flex flex-col items-end">
+                    <span class="text-[10px] text-blue-200 font-bold uppercase tracking-wider mb-0.5">Välj Vecka</span>
+                    <select id="week-selector" onchange="changeWeek(this.value)" class="bg-blue-700 border border-blue-500 text-white text-base font-bold rounded-lg px-3 py-1.5 outline-none appearance-none cursor-pointer shadow-sm text-center min-w-[80px]">
+                        <option value="">Laddar...</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="flex px-2 mt-2">
+                <button onclick="switchTab('tab-my-shifts')" id="btn-tab-my-shifts" class="flex-1 pb-2 pt-1 text-center font-bold text-white border-b-4 border-white">
+                    <i class="fa-solid fa-list-ul mr-1.5"></i> Mina pass
+                </button>
+                <button onclick="switchTab('tab-grid')" id="btn-tab-grid" class="flex-1 pb-2 pt-1 text-center font-bold text-blue-200 border-b-4 border-transparent hover:text-white transition-colors">
+                    <i class="fa-solid fa-border-all mr-1.5"></i> Alla scheman
+                </button>
+            </div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto bg-gray-100 relative">
+            
+            <div id="loading-spinner" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 z-50">
+                <i class="fa-solid fa-circle-notch fa-spin text-4xl text-blue-500 mb-3"></i>
+                <p class="text-gray-500 font-medium">Hämtar scheman...</p>
+            </div>
+
+            <div id="tab-my-shifts" class="p-4 hidden pb-20">
+                <h2 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3 ml-1">Dina inplanerade tider</h2>
+                <div id="my-shifts-list" class="space-y-3">
+                    </div>
+            </div>
+
+            <div id="tab-grid" class="hidden flex flex-col h-full">
+                <div class="bg-white p-3 border-b border-gray-200 shadow-sm shrink-0 z-10 flex items-center justify-between gap-3">
+                    <label class="text-xs font-bold text-gray-500 uppercase shrink-0">Visa avdelning:</label>
+                    <select id="grid-department-selector" onchange="renderGrid()" class="flex-1 border border-gray-300 rounded-lg p-2 text-sm font-bold bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 text-ellipsis">
+                        </select>
+                </div>
+                
+                <div id="grid-container" class="flex-1 overflow-auto bg-white p-2">
+                    <table class="min-w-full border-collapse border-0 text-sm">
+                        <thead id="grid-thead" class="bg-gray-50"></thead>
+                        <tbody id="grid-tbody" class="bg-white"></tbody>
+                    </table>
+                    <div id="grid-empty-state" class="hidden text-center py-10 text-gray-400 italic">Inga publicerade pass denna vecka.</div>
+                </div>
+            </div>
+            
+        </main>
+    </div>
+
+    <script>
+        const daysMap = { 'mon': 'Måndag', 'tue': 'Tisdag', 'wed': 'Onsdag', 'thu': 'Torsdag', 'fri': 'Fredag', 'sat': 'Lördag', 'sun': 'Söndag' };
+        
+        let state = {
+            settings: {}, // Lade till settings här!
+            schedules: [],
+            staff: [],
+            needs: [],
+            published_schedules: []
+        };
+
+        let myIdentity = JSON.parse(localStorage.getItem('schemavisare_user')) || null;
+        let activeWeekStr = null; // Format: "YYYY_WW"
+        let availableWeeks = [];
+
+        // --- HJÄLPFUNKTIONER KALENDER ---
+        function getWeekNumber(d) {
+            d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+            d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
+            let yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+            return Math.ceil(( ( (d - yearStart) / 86400000) + 1)/7);
+        }
+        
+        function getMondayOfISOWeek(w, y) {
+            let simple = new Date(y, 0, 1 + (w - 1) * 7);
+            let dow = simple.getDay();
+            let ISOweekStart = simple;
+            if (dow <= 4) ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
+            else ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
+            return ISOweekStart;
+        }
+
+        function calculateNeedHours(startTime, endTime, breakHours, daySpan) {
+            if (!startTime || !endTime) return 0;
+            let [sh, sm] = startTime.split(':').map(Number);
+            let [eh, em] = endTime.split(':').map(Number);
+            let startDec = sh + (sm/60);
+            let endDec = eh + (em/60);
+            let total = ((daySpan || 0) * 24) + endDec - startDec;
+            if (total < 0) total += 24; 
+            if (breakHours) total -= breakHours;
+            return Math.max(0, total);
+        }
+
+        function formatShiftTime(start, end, daySpan) {
+            let spanText = daySpan > 0 ? `<span class="text-[10px] text-orange-500 font-bold ml-1 align-top">+${daySpan}d</span>` : '';
+            return `${start} - ${end}${spanText}`;
+        }
+
+        // --- NY KOD: SÄKERHET (PIN-KOD) ---
+        function checkPinState() {
+            const requiredPin = state.settings.viewerPin;
+            const savedPin = localStorage.getItem('schemavisare_pin');
+
+            if (requiredPin && requiredPin.trim() !== '' && requiredPin !== savedPin) {
+                // Kasta ut användaren till Låsskärmen
+                document.getElementById('pin-screen').classList.remove('hidden');
+                document.getElementById('identity-screen').classList.add('hidden');
+                document.getElementById('main-app').classList.add('hidden');
+            } else {
+                // Släpp igenom
+                document.getElementById('pin-screen').classList.add('hidden');
+                checkIdentityState();
+            }
+        }
+
+        function verifyPin() {
+            const input = document.getElementById('pin-input').value.trim();
+            const requiredPin = state.settings.viewerPin;
+
+            if (input === requiredPin) {
+                // Koden stämmer! Spara biljetten i telefonen
+                localStorage.setItem('schemavisare_pin', input);
+                document.getElementById('pin-error').classList.add('hidden');
+                document.getElementById('pin-input').value = '';
+                checkPinState(); // Släpp in!
+            } else {
+                document.getElementById('pin-error').classList.remove('hidden');
+                document.getElementById('pin-input').value = '';
+                document.getElementById('pin-input').focus();
+            }
+        }
+
+        // --- IDENTITET (VEM ÄR DU) ---
+        function checkIdentityState() {
+            if (!myIdentity) {
+                document.getElementById('identity-screen').classList.remove('hidden');
+                document.getElementById('main-app').classList.add('hidden');
+                renderIdentityDropdowns();
+            } else {
+                document.getElementById('identity-screen').classList.add('hidden');
+                document.getElementById('main-app').classList.remove('hidden');
+                
+                const staffObj = state.staff.find(s => s.id === myIdentity.staffId);
+                if (staffObj) {
+                    document.getElementById('user-name-display').innerText = staffObj.nickname || staffObj.name;
+                }
+                
+                updateWeekSelector();
+            }
+        }
+
+        function renderIdentityDropdowns() {
+            const deptSelect = document.getElementById('id-department');
+            deptSelect.innerHTML = '<option value="">-- Välj avdelning --</option>' + 
+                state.schedules.map(sch => `<option value="${sch.id}">${sch.name}</option>`).join('');
+        }
+
+        function filterIdentityStaff() {
+            const deptId = document.getElementById('id-department').value;
+            const staffSelect = document.getElementById('id-staff');
+            const btn = document.getElementById('btn-save-identity');
+            
+            if (!deptId) {
+                staffSelect.innerHTML = '<option value="">-- Välj avdelning först --</option>';
+                staffSelect.disabled = true;
+                btn.disabled = true;
+                return;
+            }
+
+            const relevantStaff = state.staff.filter(s => s.isActive && s.allowedSchedules.includes(deptId));
+            relevantStaff.sort((a,b) => (a.nickname || a.name).localeCompare(b.nickname || b.name));
+
+            staffSelect.innerHTML = '<option value="">-- Välj ditt namn --</option>' + 
+                relevantStaff.map(s => `<option value="${s.id}">${s.nickname || s.name}</option>`).join('');
+                
+            staffSelect.disabled = false;
+            btn.disabled = true;
+        }
+
+        function checkIdentityReady() {
+            const staffId = document.getElementById('id-staff').value;
+            document.getElementById('btn-save-identity').disabled = !staffId;
+        }
+
+        function saveIdentity() {
+            const deptId = document.getElementById('id-department').value;
+            const staffId = document.getElementById('id-staff').value;
+            if(!deptId || !staffId) return;
+
+            myIdentity = { departmentId: deptId, staffId: staffId };
+            localStorage.setItem('schemavisare_user', JSON.stringify(myIdentity));
+            checkIdentityState();
+        }
+
+        function resetIdentity() {
+            myIdentity = null;
+            localStorage.removeItem('schemavisare_user');
+            checkIdentityState();
+        }
+
+        // --- VECKOR OCH DATA ---
+        function updateWeekSelector() {
+            const today = new Date();
+            const currentWk = getWeekNumber(today);
+            const currentYr = today.getFullYear();
+            const threshold = currentYr * 100 + currentWk; // t.ex. 202614
+
+            // Hitta alla unika år+vecka som är publicerade OCH som är nutid/framtid
+            const weekSet = new Set();
+            state.published_schedules.forEach(pub => {
+                const val = pub.year * 100 + pub.week;
+                if (val >= threshold) {
+                    weekSet.add(`${pub.year}_${pub.week}`);
+                }
+            });
+
+            availableWeeks = Array.from(weekSet).sort(); // Sorterar äldst (nutid) -> framtid
+
+            const selector = document.getElementById('week-selector');
+            
+            if (availableWeeks.length === 0) {
+                selector.innerHTML = `<option value="">Inga publicerade veckor</option>`;
+                activeWeekStr = null;
+                document.getElementById('loading-spinner').classList.add('hidden');
+                renderMyShifts();
+                renderGrid();
+                return;
+            }
+
+            selector.innerHTML = availableWeeks.map(wStr => {
+                const [y, w] = wStr.split('_');
+                return `<option value="${wStr}">V.${w} (${y})</option>`;
+            }).join('');
+
+            // Om vi inte har någon aktiv vecka vald, eller om den vi valde raderades, ta den första i listan
+            if (!activeWeekStr || !availableWeeks.includes(activeWeekStr)) {
+                activeWeekStr = availableWeeks[0];
+            }
+            
+            selector.value = activeWeekStr;
+
+            // Fyll även i avdelnings-väljaren för flik 2 om den är tom
+            const gridDeptSelect = document.getElementById('grid-department-selector');
+            if (gridDeptSelect.options.length <= 0 && state.schedules.length > 0) {
+                gridDeptSelect.innerHTML = state.schedules.map(sch => `<option value="${sch.id}">${sch.name}</option>`).join('');
+                if (myIdentity && state.schedules.some(s => s.id === myIdentity.departmentId)) {
+                    gridDeptSelect.value = myIdentity.departmentId;
+                }
+            }
+
+            document.getElementById('loading-spinner').classList.add('hidden');
+            
+            renderMyShifts();
+            renderGrid();
+        }
+
+        function changeWeek(wStr) {
+            if (!wStr) return;
+            activeWeekStr = wStr;
+            renderMyShifts();
+            renderGrid();
+        }
+
+        // --- FLIK 1: MINA PASS ---
+        function renderMyShifts() {
+            const container = document.getElementById('my-shifts-list');
+            
+            if (!myIdentity || !activeWeekStr) {
+                container.innerHTML = '<p class="text-center text-gray-500 py-10">Inga pass hittades.</p>';
+                return;
+            }
+
+            const [year, week] = activeWeekStr.split('_').map(Number);
+            const myStaffId = myIdentity.staffId;
+            const orderList = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+            let mondayDate = getMondayOfISOWeek(week, year);
+
+            let myPasses = [];
+            let totalHours = 0;
+
+            // Samla in alla pass där Kalle är inbokad denna vecka, från ALLA avdelningar
+            const weeklyPubs = state.published_schedules.filter(p => p.year === year && p.week === week);
+
+            weeklyPubs.forEach(pub => {
+                const schId = pub.scheduleId;
+                const scheduleInfo = state.schedules.find(s => s.id === schId);
+                const schName = scheduleInfo ? scheduleInfo.name : 'Okänd Avdelning';
+
+                Object.keys(pub.data).forEach(needId => {
+                    const assignments = pub.data[needId];
+                    const needMeta = state.needs.find(n => n.id === needId);
+                    if (!needMeta || needMeta.isAbsenceTracker || needMeta.isLendingTracker) return;
+
+                    orderList.forEach(day => {
+                        if (assignments[day] && Array.isArray(assignments[day])) {
+                            const timesAssigned = assignments[day].filter(id => id === myStaffId).length;
+                            if (timesAssigned > 0) {
+                                // Han har ett pass här!
+                                const h = calculateNeedHours(needMeta.startTime, needMeta.endTime, needMeta.breakHours, needMeta.daySpan) * timesAssigned;
+                                totalHours += h;
+                                
+                                myPasses.push({
+                                    dayKey: day,
+                                    dayIndex: orderList.indexOf(day),
+                                    title: needMeta.title,
+                                    startTime: needMeta.startTime,
+                                    endTime: needMeta.endTime,
+                                    daySpan: needMeta.daySpan,
+                                    hours: h,
+                                    isBorrowed: schId !== myIdentity.departmentId,
+                                    schName: schName
+                                });
+                            }
+                        }
+                    });
+                });
+            });
+
+            if (myPasses.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl p-8 text-center mt-6">
+                        <i class="fa-solid fa-mug-hot text-gray-300 text-4xl mb-3"></i>
+                        <p class="text-gray-500 font-medium">Du har inga pass inplanerade denna vecka.</p>
+                    </div>`;
+                return;
+            }
+
+            // Sortera passen efter dag
+            myPasses.sort((a, b) => a.dayIndex - b.dayIndex);
+
+            container.innerHTML = myPasses.map(pass => {
+                let d = new Date(mondayDate);
+                d.setDate(d.getDate() + pass.dayIndex);
+                let dateStr = d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' });
+                let dayName = daysMap[pass.dayKey];
+
+                let borrowedBadge = pass.isBorrowed 
+                    ? `<div class="mt-2 text-xs font-bold text-teal-700 bg-teal-50 inline-block px-2 py-1 rounded border border-teal-200"><i class="fa-solid fa-handshake mr-1"></i> Utlånad till: ${pass.schName}</div>` 
+                    : '';
+                    
+                let timeStr = formatShiftTime(pass.startTime, pass.endTime, pass.daySpan);
+
+                return `
+                    <div class="bg-white rounded-xl shadow-sm border ${pass.isBorrowed ? 'border-teal-300 border-l-4 border-l-teal-500' : 'border-gray-200 border-l-4 border-l-blue-500'} p-4 transition-all">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="font-black text-gray-800 text-sm tracking-wide uppercase">${dayName} <span class="text-gray-400 ml-1 font-semibold">${dateStr}</span></div>
+                            <div class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded text-sm tracking-tight"><i class="fa-regular fa-clock mr-1 opacity-70"></i> ${timeStr}</div>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900 leading-tight">${pass.title}</h3>
+                        ${borrowedBadge}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // --- FLIK 2: HELA SCHEMAT (RUTNÄT) ---
+        function renderGrid() {
+            const deptId = document.getElementById('grid-department-selector').value;
+            const thead = document.getElementById('grid-thead');
+            const tbody = document.getElementById('grid-tbody');
+            const emptyState = document.getElementById('grid-empty-state');
+            
+            thead.innerHTML = ''; tbody.innerHTML = '';
+            
+            if (!activeWeekStr || !deptId) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            const [year, week] = activeWeekStr.split('_').map(Number);
+            const pubId = `pub_${deptId}_${year}_${week}`;
+            const pubDoc = state.published_schedules.find(p => p.id === pubId);
+            
+            if (!pubDoc || !pubDoc.data || Object.keys(pubDoc.data).length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+            const scheduleInfo = state.schedules.find(s => s.id === deptId) || { weekStart: 'mon', layout: 'standard' };
+            const layout = scheduleInfo.layout || 'standard';
+            const weekStart = scheduleInfo.weekStart || 'mon';
+            const order = weekStart === 'mon' ? ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] : ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+            
+            let mondayDate = getMondayOfISOWeek(week, year);
+
+            // Filtrera ut de Needs som faktiskt finns med i pubDoc.data
+            const activeNeedsIds = Object.keys(pubDoc.data);
+            const activeNeeds = state.needs.filter(n => activeNeedsIds.includes(n.id)).sort((a,b) => (a.sortOrder||0)-(b.sortOrder||0));
+
+            const myStaffId = myIdentity ? myIdentity.staffId : null;
+
+            if (layout === 'transposed') {
+                let trHead = document.createElement('tr');
+                trHead.innerHTML = `<th class="px-3 py-2 text-left font-bold sticky-col sticky-col-top bg-gray-100 w-32 border-b-2 border-r-2 border-gray-200">Behov / Rutt</th>`;
+                order.forEach(day => {
+                    let d = new Date(mondayDate); d.setDate(d.getDate() + (order.indexOf(day)));
+                    if(weekStart==='sun' && day==='sun') { d = new Date(mondayDate); d.setDate(d.getDate()-1); }
+                    
+                    trHead.innerHTML += `<th class="px-3 py-2 text-left font-bold sticky-col-top border-b-2 border-r-2 border-gray-200 min-w-[120px] bg-white">
+                        <div class="text-gray-800 text-xs">${daysMap[day]}</div>
+                        <div class="text-xs text-blue-600">${d.toLocaleDateString('sv-SE', {day:'numeric',month:'numeric'})}</div>
+                    </th>`;
+                });
+                thead.appendChild(trHead);
+
+                activeNeeds.forEach(need => {
+                    let tr = document.createElement('tr');
+                    tr.className = "border-b border-gray-200";
+                    
+                    let hcText = need.headcount > 1 ? `<span class="bg-blue-100 text-blue-800 text-[9px] px-1 rounded ml-1">x${need.headcount}</span>` : '';
+                    
+                    tr.innerHTML = `<th class="p-2 text-left sticky-col bg-gray-50 border-r-2 border-gray-200 align-top z-20">
+                        <div class="font-bold text-gray-800 text-[11px] leading-tight">${need.title} ${hcText}</div>
+                        <div class="text-[10px] text-gray-500 font-normal mt-0.5">${formatShiftTime(need.startTime, need.endTime, need.daySpan)}</div>
+                    </th>`;
+
+                    order.forEach(day => {
+                        const assignments = pubDoc.data[need.id][day] || [];
+                        const hc = need.headcount || 1;
+                        let cellHtml = `<td class="p-1 border-r border-gray-200 align-top bg-white">`;
+                        
+                        if (need.activeDays.includes(day)) {
+                            cellHtml += `<div class="flex flex-col gap-1">`;
+                            for(let i = 0; i < hc; i++) {
+                                const sId = assignments[i];
+                                let sName = "-";
+                                let styling = "bg-gray-50 text-gray-500 border-gray-200 grid-cell-dimmed";
+                                
+                                if (sId) {
+                                    const staffObj = state.staff.find(s => s.id === sId);
+                                    if (staffObj) {
+                                        sName = staffObj.nickname || staffObj.name;
+                                        const isBorrowed = !staffObj.allowedSchedules.includes(deptId);
+                                        if (isBorrowed) sName = `🤝 ${sName}`;
+                                        
+                                        if (sId === myStaffId) {
+                                            styling = "grid-cell-highlight text-blue-900 font-bold border-blue-400";
+                                        } else {
+                                            styling = "bg-white text-gray-700 border-gray-300 grid-cell-dimmed shadow-sm";
+                                        }
+                                    } else {
+                                        sName = "Borttagen";
+                                    }
+                                }
+                                cellHtml += `<div class="text-[10px] border rounded px-1.5 py-1 ${styling} truncate">${sName}</div>`;
+                            }
+                            cellHtml += `</div>`;
+                        } else {
+                            cellHtml += `<div class="text-center text-gray-200 text-[10px]">-</div>`;
+                        }
+                        cellHtml += `</td>`;
+                        tr.innerHTML += cellHtml;
+                    });
+                    tbody.appendChild(tr);
+                });
+
+            } else {
+                // Layout: Standard (Dagar nedåt)
+                let trHead = document.createElement('tr');
+                trHead.innerHTML = `<th class="px-3 py-2 text-left font-bold sticky-col sticky-col-top bg-gray-100 w-24 border-b-2 border-r-2 border-gray-200">Dag</th>`;
+                
+                activeNeeds.forEach(need => {
+                    let hcText = need.headcount > 1 ? `<span class="bg-blue-100 text-blue-800 text-[9px] px-1 rounded ml-1">x${need.headcount}</span>` : '';
+                    trHead.innerHTML += `
+                        <th class="p-2 text-left border-r-2 border-b-2 border-gray-200 bg-white sticky-col-top align-top shadow-sm min-w-[100px]">
+                            <div class="font-bold text-gray-800 text-[11px] leading-tight">${need.title} ${hcText}</div>
+                            <div class="text-[10px] text-gray-500 font-normal mt-0.5">${formatShiftTime(need.startTime, need.endTime, need.daySpan)}</div>
+                        </th>`;
+                });
+                thead.appendChild(trHead);
+
+                order.forEach(day => {
+                    let d = new Date(mondayDate); d.setDate(d.getDate() + (order.indexOf(day)));
+                    if(weekStart==='sun' && day==='sun') { d = new Date(mondayDate); d.setDate(d.getDate()-1); }
+                    
+                    let trDay = document.createElement('tr');
+                    trDay.className = "border-b border-gray-200";
+                    trDay.innerHTML = `<td class="px-2 py-2 font-semibold sticky-col border-r-2 border-gray-200 bg-gray-50 z-20">
+                        <div class="text-gray-800 text-[11px]">${daysMap[day]}</div>
+                        <div class="text-[10px] text-blue-600">${d.toLocaleDateString('sv-SE', {day:'numeric',month:'numeric'})}</div>
+                    </td>`;
+
+                    activeNeeds.forEach(need => {
+                        const assignments = pubDoc.data[need.id][day] || [];
+                        const hc = need.headcount || 1;
+                        let cellHtml = `<td class="p-1 border-r border-gray-200 align-top bg-white">`;
+                        
+                        if (need.activeDays.includes(day)) {
+                            cellHtml += `<div class="flex flex-col gap-1">`;
+                            for(let i = 0; i < hc; i++) {
+                                const sId = assignments[i];
+                                let sName = "-";
+                                let styling = "bg-gray-50 text-gray-500 border-gray-200 grid-cell-dimmed";
+                                
+                                if (sId) {
+                                    const staffObj = state.staff.find(s => s.id === sId);
+                                    if (staffObj) {
+                                        sName = staffObj.nickname || staffObj.name;
+                                        const isBorrowed = !staffObj.allowedSchedules.includes(deptId);
+                                        if (isBorrowed) sName = `🤝 ${sName}`;
+                                        
+                                        if (sId === myStaffId) {
+                                            styling = "grid-cell-highlight text-blue-900 font-bold border-blue-400";
+                                        } else {
+                                            styling = "bg-white text-gray-700 border-gray-300 grid-cell-dimmed shadow-sm";
+                                        }
+                                    } else {
+                                        sName = "Borttagen";
+                                    }
+                                }
+                                cellHtml += `<div class="text-[10px] border rounded px-1.5 py-1 ${styling} truncate">${sName}</div>`;
+                            }
+                            cellHtml += `</div>`;
+                        } else {
+                            cellHtml += `<div class="text-center text-gray-200 text-[10px]">-</div>`;
+                        }
+                        cellHtml += `</td>`;
+                        trDay.innerHTML += cellHtml;
+                    });
+                    tbody.appendChild(trDay);
+                });
+            }
+        }
+
+        // --- FLIK-HANTERING (UI) ---
+        function switchTab(tabId) {
+            ['tab-my-shifts', 'tab-grid'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+                const btn = document.getElementById(`btn-${id}`);
+                btn.classList.remove('border-white', 'text-white');
+                btn.classList.add('border-transparent', 'text-blue-200');
+            });
+
+            document.getElementById(tabId).classList.remove('hidden');
+            const activeBtn = document.getElementById(`btn-${tabId}`);
+            activeBtn.classList.remove('border-transparent', 'text-blue-200');
+            activeBtn.classList.add('border-white', 'text-white');
+
+            if (tabId === 'tab-my-shifts') renderMyShifts();
+            if (tabId === 'tab-grid') renderGrid();
+        }
+
+    </script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Exakt samma config som schemabyggaren
+        const firebaseConfig = {
+            apiKey: "AIzaSyAZg6jb_pAByuOzpJjNXhxxLghG1Y85zSg",
+            authDomain: "schemalplanerare.firebaseapp.com",
+            projectId: "schemalplanerare",
+            storageBucket: "schemalplanerare.firebasestorage.app",
+            messagingSenderId: "718952471580",
+            appId: "1:718952471580:web:010aa44281f956980493d9"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const artifactAppId = typeof __app_id !== 'undefined' ? __app_id : 'schemabyggare-app';
+
+        async function initAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    try { await signInWithCustomToken(auth, __initial_auth_token); } 
+                    catch { await signInAnonymously(auth); }
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch(e) {
+                console.error("Auth error:", e);
+                document.getElementById('loading-spinner').innerHTML = `<p class="text-red-500 font-bold">Kunde inte ansluta till servern.</p>`;
+            }
+        }
+        initAuth();
+
+        let initialLoadCount = 0;
+        const requiredCollections = ['schedules', 'staff', 'needs', 'published_schedules'];
+
+        onAuthStateChanged(auth, (user) => {
+            if (!user) return;
+
+            // Lyssna på globala inställningar bara för att ha en baseline
+            onSnapshot(doc(db, 'artifacts', artifactAppId, 'public', 'data', 'settings', 'global'), (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    if(data.currentYear) state.settings = { ...state.settings, currentYear: data.currentYear };
+                    
+                    // NY KOD: Säkrar upp med live-lyssning på ändrad kod
+                    if(data.viewerPin !== undefined) {
+                        state.settings.viewerPin = data.viewerPin;
+                        if (initialLoadCount >= requiredCollections.length) {
+                            checkPinState(); // Kasta ut användaren direkt om koden ändras!
+                        }
+                    }
+                }
+            });
+
+            // Lyssna BARA på det som Läs-appen behöver (schedules, staff, needs, published_schedules)
+            requiredCollections.forEach(colName => {
+                onSnapshot(collection(db, 'artifacts', artifactAppId, 'public', 'data', colName), (snapshot) => {
+                    
+                    snapshot.docChanges().forEach((change) => {
+                        const data = change.doc.data();
+                        if (change.type === "added" || change.type === "modified") {
+                            const idx = state[colName].findIndex(x => x.id === data.id);
+                            if (idx > -1) state[colName][idx] = data;
+                            else state[colName].push(data);
+                        }
+                        if (change.type === "removed") {
+                            state[colName] = state[colName].filter(x => x.id !== change.doc.id);
+                        }
+                    });
+
+                    // Vi väntar med att rita om tills vi har laddat ner allt första gången
+                    initialLoadCount++;
+                    if (initialLoadCount === requiredCollections.length) {
+                        checkPinState(); // Går till låsskärmen istället för direkt in!
+                        
+                        const indicator = document.getElementById('live-indicator');
+                        if (indicator && indicator.innerHTML.includes('Offline')) {
+                            indicator.className = "ml-3 px-2 py-0.5 bg-green-500 text-white text-[10px] font-bold rounded shadow-sm transition-colors";
+                            indicator.innerHTML = '<i class="fa-solid fa-cloud"></i> Synkad';
+                        }
+                    } else if (initialLoadCount > requiredCollections.length) {
+                        // Updatering i realtid om skärmen INTE är låst
+                        if (myIdentity && document.getElementById('pin-screen').classList.contains('hidden')) {
+                            updateWeekSelector(); 
+                        } else if (!myIdentity && document.getElementById('pin-screen').classList.contains('hidden')) {
+                            renderIdentityDropdowns();
+                        }
+                    }
+                }, (error) => {
+                    console.error(`Error reading ${colName}:`, error);
+                });
+            });
+        });
+    </script>
+</body>
+</html>
