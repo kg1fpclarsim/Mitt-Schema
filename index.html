@@ -567,12 +567,29 @@
             let mondayDate = getMondayOfISOWeek(week, year);
 
             const activeNeedsIds = Object.keys(pubDoc.data);
-            const activeNeeds = state.needs.filter(n => activeNeedsIds.includes(n.id)).sort((a,b) => (a.sortOrder||0)-(b.sortOrder||0));
+        const activeNeeds = state.needs.filter(n => activeNeedsIds.includes(n.id)).sort((a,b) => (a.sortOrder||0)-(b.sortOrder||0));
 
-            const myStaffId = myIdentity ? myIdentity.staffId : null;
+        const myStaffId = myIdentity ? myIdentity.staffId : null;
 
-            const generateCellHtml = (assignments, hc) => {
-                let displayList = [];
+        // PRECALCULATE DAY METADATA FOR RED DAYS
+        const dayMeta = {};
+        order.forEach(day => {
+            let d = new Date(mondayDate); d.setDate(d.getDate() + (order.indexOf(day)));
+            if(weekStart==='sun' && day==='sun') { d = new Date(mondayDate); d.setDate(d.getDate()-1); }
+            let y = d.getFullYear();
+            let m = String(d.getMonth() + 1).padStart(2, '0');
+            let dt = String(d.getDate()).padStart(2, '0');
+            let isoDateStr = `${y}-${m}-${dt}`;
+            let holiday = getSwedishHoliday(isoDateStr);
+            dayMeta[day] = {
+                dateObj: d,
+                isRedDay: holiday || day === 'sun',
+                holidayName: holiday
+            };
+        });
+
+        const generateCellHtml = (assignments, hc) => {
+            let displayList = [];
                 for(let i = 0; i < hc; i++) {
                     const sId = assignments[i];
                     let sName = "-";
@@ -618,100 +635,114 @@
                 }
 
                 if (displayList.length > MAX_VISIBLE) {
-                    const extraCount = displayList.length - MAX_VISIBLE;
-                    html += `<button onclick="toggleExpand(this)" class="text-[9px] text-blue-500 font-bold text-center mt-0.5 hover:text-blue-700 bg-blue-50 py-0.5 rounded border border-blue-100 transition-colors">+ ${extraCount} till</button>`;
-                }
-                html += `</div>`;
-                return html;
-            };
+                const extraCount = displayList.length - MAX_VISIBLE;
+                html += `<button onclick="toggleExpand(this)" class="text-[9px] text-blue-500 font-bold text-center mt-0.5 hover:text-blue-700 bg-blue-50 py-0.5 rounded border border-blue-100 transition-colors">+ ${extraCount} till</button>`;
+            }
+            html += `</div>`;
+            return html;
+        };
 
-            if (layout === 'transposed') {
-                let trHead = document.createElement('tr');
-                trHead.innerHTML = `<th class="px-3 py-2 text-left font-bold sticky-col sticky-col-top bg-gray-100 w-32 border-b-2 border-r-2 border-gray-200">Behov / Rutt</th>`;
+        if (layout === 'transposed') {
+            let trHead = document.createElement('tr');
+            trHead.innerHTML = `<th class="px-3 py-2 text-left font-bold sticky-col sticky-col-top bg-gray-100 w-32 border-b-2 border-r-2 border-gray-200">Behov / Rutt</th>`;
+            order.forEach(day => {
+                const meta = dayMeta[day];
+                let dayColor = meta.isRedDay ? 'text-red-600' : 'text-gray-800';
+                let bgClass = meta.isRedDay ? 'bg-red-50' : 'bg-gray-100';
+                let dateColor = meta.isRedDay ? 'text-red-500' : 'text-blue-600';
+                let holidayTag = meta.holidayName ? `<div class="text-[10px] text-red-600 font-bold mt-0.5 leading-tight">${meta.holidayName}</div>` : '';
+                
+                trHead.innerHTML += `<th class="px-3 py-2 text-left font-bold sticky-col-top border-b-2 border-r-2 border-gray-200 min-w-[120px] ${bgClass}">
+                    <div class="${dayColor} text-xs">${daysMap[day]}</div>
+                    <div class="text-xs ${dateColor}">${meta.dateObj.toLocaleDateString('sv-SE', {day:'numeric',month:'numeric'})}</div>
+                    ${holidayTag}
+                </th>`;
+            });
+            thead.appendChild(trHead);
+
+            activeNeeds.forEach(need => {
+                let tr = document.createElement('tr');
+                tr.className = "border-b border-gray-200";
+                
+                let hcText = need.headcount > 1 ? `<span class="bg-blue-100 text-blue-800 text-[9px] px-1 rounded ml-1">x${need.headcount}</span>` : '';
+                
+                tr.innerHTML = `<th class="p-2 text-left sticky-col bg-gray-50 border-r-2 border-gray-200 align-top z-20">
+                    <div class="font-bold text-gray-800 text-[11px] leading-tight">${need.title} ${hcText}</div>
+                    <div class="text-[10px] text-gray-500 font-normal mt-0.5">${formatShiftTime(need.startTime, need.endTime, need.daySpan)}</div>
+                </th>`;
+
                 order.forEach(day => {
-                    let d = new Date(mondayDate); d.setDate(d.getDate() + (order.indexOf(day)));
-                    if(weekStart==='sun' && day==='sun') { d = new Date(mondayDate); d.setDate(d.getDate()-1); }
+                    const assignments = pubDoc.data[need.id][day] || [];
+                    const hc = need.headcount || 1;
+                    const isRed = dayMeta[day].isRedDay;
+                    const cellBg = isRed ? 'bg-red-50/40' : 'bg-white';
                     
-                    trHead.innerHTML += `<th class="px-3 py-2 text-left font-bold sticky-col-top border-b-2 border-r-2 border-gray-200 min-w-[120px] bg-gray-100">
-                        <div class="text-gray-800 text-xs">${daysMap[day]}</div>
-                        <div class="text-xs text-blue-600">${d.toLocaleDateString('sv-SE', {day:'numeric',month:'numeric'})}</div>
-                    </th>`;
+                    let cellHtml = `<td class="p-1 border-r border-gray-200 align-top ${cellBg}">`;
+                    
+                    if (need.activeDays.includes(day)) {
+                        cellHtml += generateCellHtml(assignments, hc);
+                    } else {
+                        cellHtml += `<div class="text-center text-gray-200 text-[10px]">-</div>`;
+                    }
+                    
+                    cellHtml += `</td>`;
+                    tr.innerHTML += cellHtml;
                 });
-                thead.appendChild(trHead);
+                tbody.appendChild(tr);
+            });
 
-                activeNeeds.forEach(need => {
-                    let tr = document.createElement('tr');
-                    tr.className = "border-b border-gray-200";
-                    
-                    let hcText = need.headcount > 1 ? `<span class="bg-blue-100 text-blue-800 text-[9px] px-1 rounded ml-1">x${need.headcount}</span>` : '';
-                    
-                    tr.innerHTML = `<th class="p-2 text-left sticky-col bg-gray-50 border-r-2 border-gray-200 align-top z-20">
+        } else {
+            let trHead = document.createElement('tr');
+            trHead.innerHTML = `<th class="px-3 py-2 text-left font-bold sticky-col sticky-col-top bg-gray-100 w-24 border-b-2 border-r-2 border-gray-200">Dag</th>`;
+            
+            activeNeeds.forEach(need => {
+                let hcText = need.headcount > 1 ? `<span class="bg-blue-100 text-blue-800 text-[9px] px-1 rounded ml-1">x${need.headcount}</span>` : '';
+                trHead.innerHTML += `
+                    <th class="p-2 text-left border-r-2 border-b-2 border-gray-200 bg-gray-100 sticky-col-top align-top shadow-sm min-w-[100px]">
                         <div class="font-bold text-gray-800 text-[11px] leading-tight">${need.title} ${hcText}</div>
                         <div class="text-[10px] text-gray-500 font-normal mt-0.5">${formatShiftTime(need.startTime, need.endTime, need.daySpan)}</div>
                     </th>`;
+            });
+            thead.appendChild(trHead);
 
-                    order.forEach(day => {
-                        const assignments = pubDoc.data[need.id][day] || [];
-                        const hc = need.headcount || 1;
-                        let cellHtml = `<td class="p-1 border-r border-gray-200 align-top bg-white">`;
-                        
-                        if (need.activeDays.includes(day)) {
-                            cellHtml += generateCellHtml(assignments, hc);
-                        } else {
-                            cellHtml += `<div class="text-center text-gray-200 text-[10px]">-</div>`;
-                        }
-                        
-                        cellHtml += `</td>`;
-                        tr.innerHTML += cellHtml;
-                    });
-                    tbody.appendChild(tr);
-                });
-
-            } else {
-                let trHead = document.createElement('tr');
-                trHead.innerHTML = `<th class="px-3 py-2 text-left font-bold sticky-col sticky-col-top bg-gray-100 w-24 border-b-2 border-r-2 border-gray-200">Dag</th>`;
+            order.forEach(day => {
+                const meta = dayMeta[day];
+                let trDay = document.createElement('tr');
+                trDay.className = "border-b border-gray-200";
                 
+                let dayColor = meta.isRedDay ? 'text-red-600' : 'text-gray-800';
+                let dateColor = meta.isRedDay ? 'text-red-500' : 'text-blue-600';
+                let holidayTag = meta.holidayName ? `<div class="text-[10px] text-red-600 font-bold mt-0.5 leading-tight">${meta.holidayName}</div>` : '';
+                let thBg = meta.isRedDay ? 'bg-red-50' : 'bg-gray-50';
+
+                trDay.innerHTML = `<td class="px-2 py-2 font-semibold sticky-col border-r-2 border-gray-200 ${thBg} z-20">
+                    <div class="${dayColor} text-[11px]">${daysMap[day]}</div>
+                    <div class="text-[10px] ${dateColor}">${meta.dateObj.toLocaleDateString('sv-SE', {day:'numeric',month:'numeric'})}</div>
+                    ${holidayTag}
+                </td>`;
+
                 activeNeeds.forEach(need => {
-                    let hcText = need.headcount > 1 ? `<span class="bg-blue-100 text-blue-800 text-[9px] px-1 rounded ml-1">x${need.headcount}</span>` : '';
-                    trHead.innerHTML += `
-                        <th class="p-2 text-left border-r-2 border-b-2 border-gray-200 bg-gray-100 sticky-col-top align-top shadow-sm min-w-[100px]">
-                            <div class="font-bold text-gray-800 text-[11px] leading-tight">${need.title} ${hcText}</div>
-                            <div class="text-[10px] text-gray-500 font-normal mt-0.5">${formatShiftTime(need.startTime, need.endTime, need.daySpan)}</div>
-                        </th>`;
-                });
-                thead.appendChild(trHead);
-
-                order.forEach(day => {
-                    let d = new Date(mondayDate); d.setDate(d.getDate() + (order.indexOf(day)));
-                    if(weekStart==='sun' && day==='sun') { d = new Date(mondayDate); d.setDate(d.getDate()-1); }
+                    const assignments = pubDoc.data[need.id][day] || [];
+                    const hc = need.headcount || 1;
+                    const cellBg = meta.isRedDay ? 'bg-red-50/40' : 'bg-white';
                     
-                    let trDay = document.createElement('tr');
-                    trDay.className = "border-b border-gray-200";
-                    trDay.innerHTML = `<td class="px-2 py-2 font-semibold sticky-col border-r-2 border-gray-200 bg-gray-50 z-20">
-                        <div class="text-gray-800 text-[11px]">${daysMap[day]}</div>
-                        <div class="text-[10px] text-blue-600">${d.toLocaleDateString('sv-SE', {day:'numeric',month:'numeric'})}</div>
-                    </td>`;
-
-                    activeNeeds.forEach(need => {
-                        const assignments = pubDoc.data[need.id][day] || [];
-                        const hc = need.headcount || 1;
-                        let cellHtml = `<td class="p-1 border-r border-gray-200 align-top bg-white">`;
-                        
-                        if (need.activeDays.includes(day)) {
-                            cellHtml += generateCellHtml(assignments, hc);
-                        } else {
-                            cellHtml += `<div class="text-center text-gray-200 text-[10px]">-</div>`;
-                        }
-                        
-                        cellHtml += `</td>`;
-                        trDay.innerHTML += cellHtml;
-                    });
-                    tbody.appendChild(trDay);
+                    let cellHtml = `<td class="p-1 border-r border-gray-200 align-top ${cellBg}">`;
+                    
+                    if (need.activeDays.includes(day)) {
+                        cellHtml += generateCellHtml(assignments, hc);
+                    } else {
+                        cellHtml += `<div class="text-center text-gray-200 text-[10px]">-</div>`;
+                    }
+                    
+                    cellHtml += `</td>`;
+                    trDay.innerHTML += cellHtml;
                 });
-            }
+                tbody.appendChild(trDay);
+            });
         }
+    }
 
-        function switchTab(tabId) {
+    function switchTab(tabId) {
             ['tab-my-shifts', 'tab-grid'].forEach(id => {
                 document.getElementById(id).classList.add('hidden');
                 const btn = document.getElementById(`btn-${id}`);
