@@ -20,7 +20,6 @@
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         
         /* Mobilvänligt rutnät */
-        .grid-cell-dimmed { opacity: 0.4; filter: grayscale(50%); transition: opacity 0.2s; }
         .grid-cell-highlight { ring: 2px solid #3b82f6; background-color: #eff6ff !important; transform: scale(1.02); z-index: 5; position: relative; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
     </style>
 </head>
@@ -177,6 +176,15 @@
             if (dow <= 4) ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
             else ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
             return ISOweekStart;
+        }
+
+        // Datumuträknare som hanterar söndagar (och tillhörande vecko-avvikelser)
+        function getDateForDay(mondayDate, day, weekStart) {
+            let dayOffset = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].indexOf(day);
+            if (weekStart === 'sun' && day === 'sun') dayOffset = -1; // Flyttar Söndagen till att vara dagen INNAN ISO-måndagen
+            let d = new Date(mondayDate);
+            d.setDate(mondayDate.getDate() + dayOffset);
+            return d;
         }
 
         function calculateNeedHours(startTime, endTime, breakHours, daySpan) {
@@ -388,31 +396,34 @@
 
             const [year, week] = activeWeekStr.split('_').map(Number);
             const myStaffId = myIdentity.staffId;
-            const orderList = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
             let mondayDate = getMondayOfISOWeek(week, year);
 
             let myPasses = [];
-
             const weeklyPubs = state.published_schedules.filter(p => p.year === year && p.week === week);
 
             weeklyPubs.forEach(pub => {
                 const schId = pub.scheduleId;
                 const scheduleInfo = state.schedules.find(s => s.id === schId);
                 const schName = scheduleInfo ? scheduleInfo.name : 'Okänd Avdelning';
+                const passWeekStart = scheduleInfo ? (scheduleInfo.weekStart || 'mon') : 'mon';
 
                 Object.keys(pub.data).forEach(needId => {
                     const assignments = pub.data[needId];
                     const needMeta = state.needs.find(n => n.id === needId);
                     if (!needMeta || needMeta.isAbsenceTracker || needMeta.isLendingTracker) return;
 
-                    orderList.forEach(day => {
+                    ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].forEach(day => {
                         if (assignments[day] && Array.isArray(assignments[day])) {
                             const timesAssigned = assignments[day].filter(id => id === myStaffId).length;
                             if (timesAssigned > 0) {
                                 const h = calculateNeedHours(needMeta.startTime, needMeta.endTime, needMeta.breakHours, needMeta.daySpan) * timesAssigned;
+                                
+                                // NY KOD: Räkna ut exakt vilket datum detta pass hamnar på
+                                const passDate = getDateForDay(mondayDate, day, passWeekStart);
+                                
                                 myPasses.push({
                                     dayKey: day,
-                                    dayIndex: orderList.indexOf(day),
+                                    dateObj: passDate, // Sparar det riktiga datum-objektet
                                     title: needMeta.title,
                                     startTime: needMeta.startTime,
                                     endTime: needMeta.endTime,
@@ -436,12 +447,11 @@
                 return;
             }
 
-            myPasses.sort((a, b) => a.dayIndex - b.dayIndex);
+            // NY KOD: Sortera listan kronologiskt baserat på faktiskt datum (inte veckodagens namn)
+            myPasses.sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
 
             container.innerHTML = myPasses.map(pass => {
-                let d = new Date(mondayDate);
-                d.setDate(d.getDate() + pass.dayIndex);
-                let dateStr = d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' });
+                let dateStr = pass.dateObj.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' });
                 let dayName = daysMap[pass.dayKey];
 
                 let borrowedBadge = pass.isBorrowed 
@@ -499,13 +509,14 @@
 
             const myStaffId = myIdentity ? myIdentity.staffId : null;
 
-            // Hjälpfunktion för att sortera och generera HTML för listan av namn i varje ruta
+            // Hjälpfunktion: Sorterar listan av namn (Jag först, sen kollegor, sist tomma platser) 
+            // och gör alla namn i normal grå text.
             const generateCellHtml = (assignments, hc) => {
                 let displayList = [];
                 for(let i = 0; i < hc; i++) {
                     const sId = assignments[i];
                     let sName = "-";
-                    let styling = "bg-gray-50 text-gray-500 border-gray-200 grid-cell-dimmed";
+                    let styling = "bg-gray-50 text-gray-400 border-gray-200"; // Tomma platser
                     let isMe = false;
                     let isEmpty = !sId;
                     
@@ -520,7 +531,7 @@
                                 styling = "grid-cell-highlight text-blue-900 font-bold border-blue-400";
                                 isMe = true;
                             } else {
-                                styling = "bg-white text-gray-700 border-gray-300 grid-cell-dimmed shadow-sm";
+                                styling = "bg-white text-gray-800 border-gray-300 shadow-sm"; // Normal läsbar text för kollegor
                             }
                         } else {
                             sName = "Borttagen";
@@ -529,13 +540,13 @@
                     displayList.push({ sName, styling, isMe, isEmpty });
                 }
 
-                // Sortering: 1. Jag, 2. Andra kollegor, 3. Obemannade platser ("-")
+                // Sortering
                 displayList.sort((a, b) => {
                     if (a.isMe && !b.isMe) return -1;
                     if (!a.isMe && b.isMe) return 1;
                     if (!a.isEmpty && b.isEmpty) return -1;
                     if (a.isEmpty && !b.isEmpty) return 1;
-                    return 0; // Behåll originalordning för resten
+                    return 0;
                 });
 
                 let html = `<div class="flex flex-col gap-1">`;
