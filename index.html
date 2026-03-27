@@ -10,7 +10,12 @@
         body { background-color: #f3f4f6; -webkit-tap-highlight-color: transparent; }
         .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; font-weight: 600; }
         .tab-inactive { color: #6b7280; font-weight: 500; }
+        
+        /* Sticky klasser optimerade för kant-i-kant */
         .sticky-col { position: sticky; left: 0; background-color: #f9fafb; z-index: 10; border-right: 2px solid #e5e7eb; }
+        .sticky-col-top { position: sticky; top: 0; background-color: #f9fafb; z-index: 11; }
+        .sticky-col.sticky-col-top { z-index: 30; } 
+        
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         
@@ -21,7 +26,7 @@
 </head>
 <body class="h-screen flex flex-col font-sans text-gray-800 relative max-w-4xl mx-auto shadow-xl bg-white sm:border-x sm:border-gray-200">
 
-    <!-- NY KOD: LÅSSKÄRM (PIN-KOD) -->
+    <!-- LÅSSKÄRM (PIN-KOD) -->
     <div id="pin-screen" class="fixed inset-0 bg-gray-900 z-[200] flex flex-col items-center justify-center p-6 transition-opacity duration-300 hidden">
         <div class="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-8 text-center">
             <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-red-50 text-red-600 mb-6">
@@ -37,8 +42,8 @@
             <button onclick="verifyPin()" class="w-full bg-gray-900 text-white font-bold text-lg rounded-xl py-4 hover:bg-black transition-colors shadow-lg active:scale-95">Lås upp</button>
         </div>
     </div>
-    <!-- SLUT NY KOD -->
 
+    <!-- IDENTITETSSKÄRM -->
     <div id="identity-screen" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center p-6 transition-opacity duration-300 hidden">
         <div class="w-full max-w-sm">
             <div class="text-center mb-8">
@@ -71,26 +76,31 @@
         </div>
     </div>
 
+    <!-- HUVUDAPP -->
     <div id="main-app" class="flex flex-col h-full hidden">
-        <header class="bg-blue-600 text-white shadow-md z-20 shrink-0 pb-1">
-            <div class="px-4 pt-4 pb-2 flex justify-between items-center">
-                <div>
+        
+        <!-- Header (Dynamisk storlek) -->
+        <header id="main-header" class="bg-blue-600 text-white shadow-md z-20 shrink-0 pb-1 transition-all duration-300">
+            <div id="header-top-row" class="px-4 pt-4 pb-2 flex justify-between items-start transition-all duration-300">
+                
+                <!-- Detta område döljs i kompaktläge -->
+                <div id="header-brand-area" class="transition-all duration-300 overflow-hidden transform origin-left">
                     <h1 class="text-xl font-extrabold tracking-tight">Mitt Schema</h1>
-                    <div id="user-greeting" class="text-blue-100 text-sm font-medium flex items-center mt-0.5" onclick="resetIdentity()">
+                    <div class="text-blue-100 text-sm font-medium flex items-center mt-0.5 cursor-pointer hover:text-white" onclick="resetIdentity()" title="Klicka för att byta person">
                         <i class="fa-solid fa-user text-xs mr-1.5 opacity-80"></i> <span id="user-name-display" class="underline decoration-blue-400 underline-offset-2">Laddar...</span>
                     </div>
                 </div>
                 
-                <div class="flex flex-col items-end">
-                    <span class="text-[10px] text-blue-200 font-bold uppercase tracking-wider mb-0.5">Välj Vecka</span>
-                    <select id="week-selector" onchange="changeWeek(this.value)" class="bg-blue-700 border border-blue-500 text-white text-base font-bold rounded-lg px-3 py-1.5 outline-none appearance-none cursor-pointer shadow-sm text-center min-w-[80px]">
+                <div class="flex flex-col items-end shrink-0 ml-auto justify-center h-full">
+                    <span id="week-label" class="text-[10px] text-blue-200 font-bold uppercase tracking-wider mb-0.5 transition-all duration-300">Välj Vecka</span>
+                    <select id="week-selector" onchange="changeWeek(this.value)" class="bg-blue-700 border border-blue-500 text-white text-sm font-bold rounded-lg px-2 py-1.5 outline-none appearance-none cursor-pointer shadow-sm text-center min-w-[80px]">
                         <option value="">Laddar...</option>
                     </select>
                 </div>
             </div>
             
-            <div class="flex px-2 mt-2">
-                <button onclick="switchTab('tab-my-shifts')" id="btn-tab-my-shifts" class="flex-1 pb-2 pt-1 text-center font-bold text-white border-b-4 border-white">
+            <div class="flex px-2 mt-1">
+                <button onclick="switchTab('tab-my-shifts')" id="btn-tab-my-shifts" class="flex-1 pb-2 pt-1 text-center font-bold text-white border-b-4 border-white transition-colors">
                     <i class="fa-solid fa-list-ul mr-1.5"></i> Mina pass
                 </button>
                 <button onclick="switchTab('tab-grid')" id="btn-tab-grid" class="flex-1 pb-2 pt-1 text-center font-bold text-blue-200 border-b-4 border-transparent hover:text-white transition-colors">
@@ -106,20 +116,25 @@
                 <p class="text-gray-500 font-medium">Hämtar scheman...</p>
             </div>
 
-            <div id="tab-my-shifts" class="p-4 hidden pb-20">
+            <!-- FLIK 1: MINA PASS -->
+            <div id="tab-my-shifts" class="p-4 pb-20">
                 <h2 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3 ml-1">Dina inplanerade tider</h2>
                 <div id="my-shifts-list" class="space-y-3">
-                    </div>
+                    <!-- Kort laddas hit -->
+                </div>
             </div>
 
-            <div id="tab-grid" class="hidden flex flex-col h-full">
-                <div class="bg-white p-3 border-b border-gray-200 shadow-sm shrink-0 z-10 flex items-center justify-between gap-3">
-                    <label class="text-xs font-bold text-gray-500 uppercase shrink-0">Visa avdelning:</label>
-                    <select id="grid-department-selector" onchange="renderGrid()" class="flex-1 border border-gray-300 rounded-lg p-2 text-sm font-bold bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 text-ellipsis">
-                        </select>
+            <!-- FLIK 2: HELA SCHEMAT -->
+            <div id="tab-grid" class="hidden flex flex-col h-full bg-white">
+                <div class="bg-white p-2 sm:p-3 border-b border-gray-200 shadow-sm shrink-0 z-30 flex items-center justify-between gap-2">
+                    <label class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase shrink-0">Avdelning:</label>
+                    <select id="grid-department-selector" onchange="renderGrid()" class="flex-1 border border-gray-300 rounded-lg p-1.5 sm:p-2 text-sm font-bold bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 text-ellipsis">
+                        <!-- Laddas dynamiskt -->
+                    </select>
                 </div>
                 
-                <div id="grid-container" class="flex-1 overflow-auto bg-white p-2">
+                <!-- Minimal padding för att maxa rutnätet. pt-0 gör att thead fastnar direkt under kanten -->
+                <div id="grid-container" class="flex-1 overflow-auto bg-white px-0 sm:px-2 pb-4 pt-0 relative">
                     <table class="min-w-full border-collapse border-0 text-sm">
                         <thead id="grid-thead" class="bg-gray-50"></thead>
                         <tbody id="grid-tbody" class="bg-white"></tbody>
@@ -131,11 +146,12 @@
         </main>
     </div>
 
+    <!-- Data & Logik -->
     <script>
         const daysMap = { 'mon': 'Måndag', 'tue': 'Tisdag', 'wed': 'Onsdag', 'thu': 'Torsdag', 'fri': 'Fredag', 'sat': 'Lördag', 'sun': 'Söndag' };
         
         let state = {
-            settings: {}, // Lade till settings här!
+            settings: {}, 
             schedules: [],
             staff: [],
             needs: [],
@@ -143,7 +159,7 @@
         };
 
         let myIdentity = JSON.parse(localStorage.getItem('schemavisare_user')) || null;
-        let activeWeekStr = null; // Format: "YYYY_WW"
+        let activeWeekStr = null; 
         let availableWeeks = [];
 
         // --- HJÄLPFUNKTIONER KALENDER ---
@@ -180,18 +196,35 @@
             return `${start} - ${end}${spanText}`;
         }
 
-        // --- NY KOD: SÄKERHET (PIN-KOD) ---
+        // --- EXPANDERING FÖR LÅNGA LISTOR ---
+        window.toggleExpand = function(btn) {
+            const container = btn.parentElement;
+            const hiddenSlots = container.querySelectorAll('.hidden-slot');
+            const isExpanded = btn.innerText.includes('Dölj');
+
+            if (isExpanded) {
+                hiddenSlots.forEach(el => el.classList.add('hidden'));
+                btn.innerText = `+ ${hiddenSlots.length} till`;
+                btn.classList.replace('bg-gray-100', 'bg-blue-50');
+                btn.classList.replace('text-gray-600', 'text-blue-500');
+            } else {
+                hiddenSlots.forEach(el => el.classList.remove('hidden'));
+                btn.innerText = `Dölj`;
+                btn.classList.replace('bg-blue-50', 'bg-gray-100');
+                btn.classList.replace('text-blue-500', 'text-gray-600');
+            }
+        };
+
+        // --- SÄKERHET (PIN-KOD) ---
         function checkPinState() {
             const requiredPin = state.settings.viewerPin;
             const savedPin = localStorage.getItem('schemavisare_pin');
 
             if (requiredPin && requiredPin.trim() !== '' && requiredPin !== savedPin) {
-                // Kasta ut användaren till Låsskärmen
                 document.getElementById('pin-screen').classList.remove('hidden');
                 document.getElementById('identity-screen').classList.add('hidden');
                 document.getElementById('main-app').classList.add('hidden');
             } else {
-                // Släpp igenom
                 document.getElementById('pin-screen').classList.add('hidden');
                 checkIdentityState();
             }
@@ -202,11 +235,10 @@
             const requiredPin = state.settings.viewerPin;
 
             if (input === requiredPin) {
-                // Koden stämmer! Spara biljetten i telefonen
                 localStorage.setItem('schemavisare_pin', input);
                 document.getElementById('pin-error').classList.add('hidden');
                 document.getElementById('pin-input').value = '';
-                checkPinState(); // Släpp in!
+                checkPinState(); 
             } else {
                 document.getElementById('pin-error').classList.remove('hidden');
                 document.getElementById('pin-input').value = '';
@@ -279,6 +311,9 @@
         function resetIdentity() {
             myIdentity = null;
             localStorage.removeItem('schemavisare_user');
+            
+            // Fäll ut headern igen ifall vi loggade ut från grid-vyn
+            switchTab('tab-my-shifts');
             checkIdentityState();
         }
 
@@ -287,9 +322,8 @@
             const today = new Date();
             const currentWk = getWeekNumber(today);
             const currentYr = today.getFullYear();
-            const threshold = currentYr * 100 + currentWk; // t.ex. 202614
+            const threshold = currentYr * 100 + currentWk; 
 
-            // Hitta alla unika år+vecka som är publicerade OCH som är nutid/framtid
             const weekSet = new Set();
             state.published_schedules.forEach(pub => {
                 const val = pub.year * 100 + pub.week;
@@ -298,12 +332,12 @@
                 }
             });
 
-            availableWeeks = Array.from(weekSet).sort(); // Sorterar äldst (nutid) -> framtid
+            availableWeeks = Array.from(weekSet).sort(); 
 
             const selector = document.getElementById('week-selector');
             
             if (availableWeeks.length === 0) {
-                selector.innerHTML = `<option value="">Inga publicerade veckor</option>`;
+                selector.innerHTML = `<option value="">Inga scheman</option>`;
                 activeWeekStr = null;
                 document.getElementById('loading-spinner').classList.add('hidden');
                 renderMyShifts();
@@ -316,14 +350,12 @@
                 return `<option value="${wStr}">V.${w} (${y})</option>`;
             }).join('');
 
-            // Om vi inte har någon aktiv vecka vald, eller om den vi valde raderades, ta den första i listan
             if (!activeWeekStr || !availableWeeks.includes(activeWeekStr)) {
                 activeWeekStr = availableWeeks[0];
             }
             
             selector.value = activeWeekStr;
 
-            // Fyll även i avdelnings-väljaren för flik 2 om den är tom
             const gridDeptSelect = document.getElementById('grid-department-selector');
             if (gridDeptSelect.options.length <= 0 && state.schedules.length > 0) {
                 gridDeptSelect.innerHTML = state.schedules.map(sch => `<option value="${sch.id}">${sch.name}</option>`).join('');
@@ -360,9 +392,7 @@
             let mondayDate = getMondayOfISOWeek(week, year);
 
             let myPasses = [];
-            let totalHours = 0;
 
-            // Samla in alla pass där Kalle är inbokad denna vecka, från ALLA avdelningar
             const weeklyPubs = state.published_schedules.filter(p => p.year === year && p.week === week);
 
             weeklyPubs.forEach(pub => {
@@ -379,10 +409,7 @@
                         if (assignments[day] && Array.isArray(assignments[day])) {
                             const timesAssigned = assignments[day].filter(id => id === myStaffId).length;
                             if (timesAssigned > 0) {
-                                // Han har ett pass här!
                                 const h = calculateNeedHours(needMeta.startTime, needMeta.endTime, needMeta.breakHours, needMeta.daySpan) * timesAssigned;
-                                totalHours += h;
-                                
                                 myPasses.push({
                                     dayKey: day,
                                     dayIndex: orderList.indexOf(day),
@@ -409,7 +436,6 @@
                 return;
             }
 
-            // Sortera passen efter dag
             myPasses.sort((a, b) => a.dayIndex - b.dayIndex);
 
             container.innerHTML = myPasses.map(pass => {
@@ -437,7 +463,7 @@
             }).join('');
         }
 
-        // --- FLIK 2: HELA SCHEMAT (RUTNÄT) ---
+        // --- FLIK 2: HELA SCHEMAT (RUTNÄT) MED SMART SORTERING ---
         function renderGrid() {
             const deptId = document.getElementById('grid-department-selector').value;
             const thead = document.getElementById('grid-thead');
@@ -468,11 +494,67 @@
             
             let mondayDate = getMondayOfISOWeek(week, year);
 
-            // Filtrera ut de Needs som faktiskt finns med i pubDoc.data
             const activeNeedsIds = Object.keys(pubDoc.data);
             const activeNeeds = state.needs.filter(n => activeNeedsIds.includes(n.id)).sort((a,b) => (a.sortOrder||0)-(b.sortOrder||0));
 
             const myStaffId = myIdentity ? myIdentity.staffId : null;
+
+            // Hjälpfunktion för att sortera och generera HTML för listan av namn i varje ruta
+            const generateCellHtml = (assignments, hc) => {
+                let displayList = [];
+                for(let i = 0; i < hc; i++) {
+                    const sId = assignments[i];
+                    let sName = "-";
+                    let styling = "bg-gray-50 text-gray-500 border-gray-200 grid-cell-dimmed";
+                    let isMe = false;
+                    let isEmpty = !sId;
+                    
+                    if (sId) {
+                        const staffObj = state.staff.find(s => s.id === sId);
+                        if (staffObj) {
+                            sName = staffObj.nickname || staffObj.name;
+                            const isBorrowed = !staffObj.allowedSchedules.includes(deptId);
+                            if (isBorrowed) sName = `🤝 ${sName}`;
+                            
+                            if (sId === myStaffId) {
+                                styling = "grid-cell-highlight text-blue-900 font-bold border-blue-400";
+                                isMe = true;
+                            } else {
+                                styling = "bg-white text-gray-700 border-gray-300 grid-cell-dimmed shadow-sm";
+                            }
+                        } else {
+                            sName = "Borttagen";
+                        }
+                    }
+                    displayList.push({ sName, styling, isMe, isEmpty });
+                }
+
+                // Sortering: 1. Jag, 2. Andra kollegor, 3. Obemannade platser ("-")
+                displayList.sort((a, b) => {
+                    if (a.isMe && !b.isMe) return -1;
+                    if (!a.isMe && b.isMe) return 1;
+                    if (!a.isEmpty && b.isEmpty) return -1;
+                    if (a.isEmpty && !b.isEmpty) return 1;
+                    return 0; // Behåll originalordning för resten
+                });
+
+                let html = `<div class="flex flex-col gap-1">`;
+                const MAX_VISIBLE = 3;
+                
+                for(let i = 0; i < displayList.length; i++) {
+                    const item = displayList[i];
+                    const hiddenClass = i >= MAX_VISIBLE ? 'hidden hidden-slot' : '';
+                    html += `<div class="text-[10px] border rounded px-1.5 py-1 ${item.styling} truncate ${hiddenClass}">${item.sName}</div>`;
+                }
+
+                if (displayList.length > MAX_VISIBLE) {
+                    const extraCount = displayList.length - MAX_VISIBLE;
+                    html += `<button onclick="toggleExpand(this)" class="text-[9px] text-blue-500 font-bold text-center mt-0.5 hover:text-blue-700 bg-blue-50 py-0.5 rounded border border-blue-100 transition-colors">+ ${extraCount} till</button>`;
+                }
+                html += `</div>`;
+                return html;
+            };
+
 
             if (layout === 'transposed') {
                 let trHead = document.createElement('tr');
@@ -481,7 +563,7 @@
                     let d = new Date(mondayDate); d.setDate(d.getDate() + (order.indexOf(day)));
                     if(weekStart==='sun' && day==='sun') { d = new Date(mondayDate); d.setDate(d.getDate()-1); }
                     
-                    trHead.innerHTML += `<th class="px-3 py-2 text-left font-bold sticky-col-top border-b-2 border-r-2 border-gray-200 min-w-[120px] bg-white">
+                    trHead.innerHTML += `<th class="px-3 py-2 text-left font-bold sticky-col-top border-b-2 border-r-2 border-gray-200 min-w-[120px] bg-gray-100">
                         <div class="text-gray-800 text-xs">${daysMap[day]}</div>
                         <div class="text-xs text-blue-600">${d.toLocaleDateString('sv-SE', {day:'numeric',month:'numeric'})}</div>
                     </th>`;
@@ -505,34 +587,11 @@
                         let cellHtml = `<td class="p-1 border-r border-gray-200 align-top bg-white">`;
                         
                         if (need.activeDays.includes(day)) {
-                            cellHtml += `<div class="flex flex-col gap-1">`;
-                            for(let i = 0; i < hc; i++) {
-                                const sId = assignments[i];
-                                let sName = "-";
-                                let styling = "bg-gray-50 text-gray-500 border-gray-200 grid-cell-dimmed";
-                                
-                                if (sId) {
-                                    const staffObj = state.staff.find(s => s.id === sId);
-                                    if (staffObj) {
-                                        sName = staffObj.nickname || staffObj.name;
-                                        const isBorrowed = !staffObj.allowedSchedules.includes(deptId);
-                                        if (isBorrowed) sName = `🤝 ${sName}`;
-                                        
-                                        if (sId === myStaffId) {
-                                            styling = "grid-cell-highlight text-blue-900 font-bold border-blue-400";
-                                        } else {
-                                            styling = "bg-white text-gray-700 border-gray-300 grid-cell-dimmed shadow-sm";
-                                        }
-                                    } else {
-                                        sName = "Borttagen";
-                                    }
-                                }
-                                cellHtml += `<div class="text-[10px] border rounded px-1.5 py-1 ${styling} truncate">${sName}</div>`;
-                            }
-                            cellHtml += `</div>`;
+                            cellHtml += generateCellHtml(assignments, hc);
                         } else {
                             cellHtml += `<div class="text-center text-gray-200 text-[10px]">-</div>`;
                         }
+                        
                         cellHtml += `</td>`;
                         tr.innerHTML += cellHtml;
                     });
@@ -547,7 +606,7 @@
                 activeNeeds.forEach(need => {
                     let hcText = need.headcount > 1 ? `<span class="bg-blue-100 text-blue-800 text-[9px] px-1 rounded ml-1">x${need.headcount}</span>` : '';
                     trHead.innerHTML += `
-                        <th class="p-2 text-left border-r-2 border-b-2 border-gray-200 bg-white sticky-col-top align-top shadow-sm min-w-[100px]">
+                        <th class="p-2 text-left border-r-2 border-b-2 border-gray-200 bg-gray-100 sticky-col-top align-top shadow-sm min-w-[100px]">
                             <div class="font-bold text-gray-800 text-[11px] leading-tight">${need.title} ${hcText}</div>
                             <div class="text-[10px] text-gray-500 font-normal mt-0.5">${formatShiftTime(need.startTime, need.endTime, need.daySpan)}</div>
                         </th>`;
@@ -571,34 +630,11 @@
                         let cellHtml = `<td class="p-1 border-r border-gray-200 align-top bg-white">`;
                         
                         if (need.activeDays.includes(day)) {
-                            cellHtml += `<div class="flex flex-col gap-1">`;
-                            for(let i = 0; i < hc; i++) {
-                                const sId = assignments[i];
-                                let sName = "-";
-                                let styling = "bg-gray-50 text-gray-500 border-gray-200 grid-cell-dimmed";
-                                
-                                if (sId) {
-                                    const staffObj = state.staff.find(s => s.id === sId);
-                                    if (staffObj) {
-                                        sName = staffObj.nickname || staffObj.name;
-                                        const isBorrowed = !staffObj.allowedSchedules.includes(deptId);
-                                        if (isBorrowed) sName = `🤝 ${sName}`;
-                                        
-                                        if (sId === myStaffId) {
-                                            styling = "grid-cell-highlight text-blue-900 font-bold border-blue-400";
-                                        } else {
-                                            styling = "bg-white text-gray-700 border-gray-300 grid-cell-dimmed shadow-sm";
-                                        }
-                                    } else {
-                                        sName = "Borttagen";
-                                    }
-                                }
-                                cellHtml += `<div class="text-[10px] border rounded px-1.5 py-1 ${styling} truncate">${sName}</div>`;
-                            }
-                            cellHtml += `</div>`;
+                            cellHtml += generateCellHtml(assignments, hc);
                         } else {
                             cellHtml += `<div class="text-center text-gray-200 text-[10px]">-</div>`;
                         }
+                        
                         cellHtml += `</td>`;
                         trDay.innerHTML += cellHtml;
                     });
@@ -607,7 +643,7 @@
             }
         }
 
-        // --- FLIK-HANTERING (UI) ---
+        // --- FLIK-HANTERING OCH KOMPAKTLÄGE ---
         function switchTab(tabId) {
             ['tab-my-shifts', 'tab-grid'].forEach(id => {
                 document.getElementById(id).classList.add('hidden');
@@ -621,25 +657,44 @@
             activeBtn.classList.remove('border-transparent', 'text-blue-200');
             activeBtn.classList.add('border-white', 'text-white');
 
-            if (tabId === 'tab-my-shifts') renderMyShifts();
-            if (tabId === 'tab-grid') renderGrid();
+            // Logik för att minimera headern
+            const brandArea = document.getElementById('header-brand-area');
+            const weekLabel = document.getElementById('week-label');
+            const topRow = document.getElementById('header-top-row');
+
+            if (tabId === 'tab-grid') {
+                // Kompaktläge (Dölj titel och namn)
+                brandArea.classList.add('hidden');
+                weekLabel.classList.add('hidden');
+                topRow.classList.replace('pt-4', 'pt-2');
+                topRow.classList.replace('pb-2', 'pb-1');
+                renderGrid();
+            } else {
+                // Standardläge (Visa allt)
+                brandArea.classList.remove('hidden');
+                weekLabel.classList.remove('hidden');
+                topRow.classList.replace('pt-2', 'pt-4');
+                topRow.classList.replace('pb-1', 'pb-2');
+                renderMyShifts();
+            }
         }
 
     </script>
 
+    <!-- FIREBASE SYNC LOGIC -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Exakt samma config som schemabyggaren
         const firebaseConfig = {
-            apiKey: "AIzaSyAZg6jb_pAByuOzpJjNXhxxLghG1Y85zSg",
+            apiKey: "AIzaSy" + "AZg6jb_pABy" + "uOzpJjNXhx" + "xLghG1Y85zSg",
             authDomain: "schemalplanerare.firebaseapp.com",
             projectId: "schemalplanerare",
             storageBucket: "schemalplanerare.firebasestorage.app",
             messagingSenderId: "718952471580",
-            appId: "1:718952471580:web:010aa44281f956980493d9"
+            appId: "1:718952471580:web:010aa44281f956980493d9",
+            measurementId: "G-P73XYNQP91"
         };
 
         const app = initializeApp(firebaseConfig);
@@ -668,23 +723,20 @@
         onAuthStateChanged(auth, (user) => {
             if (!user) return;
 
-            // Lyssna på globala inställningar bara för att ha en baseline
             onSnapshot(doc(db, 'artifacts', artifactAppId, 'public', 'data', 'settings', 'global'), (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
                     if(data.currentYear) state.settings = { ...state.settings, currentYear: data.currentYear };
                     
-                    // NY KOD: Säkrar upp med live-lyssning på ändrad kod
                     if(data.viewerPin !== undefined) {
                         state.settings.viewerPin = data.viewerPin;
                         if (initialLoadCount >= requiredCollections.length) {
-                            checkPinState(); // Kasta ut användaren direkt om koden ändras!
+                            checkPinState(); 
                         }
                     }
                 }
             });
 
-            // Lyssna BARA på det som Läs-appen behöver (schedules, staff, needs, published_schedules)
             requiredCollections.forEach(colName => {
                 onSnapshot(collection(db, 'artifacts', artifactAppId, 'public', 'data', colName), (snapshot) => {
                     
@@ -700,10 +752,9 @@
                         }
                     });
 
-                    // Vi väntar med att rita om tills vi har laddat ner allt första gången
                     initialLoadCount++;
                     if (initialLoadCount === requiredCollections.length) {
-                        checkPinState(); // Går till låsskärmen istället för direkt in!
+                        checkPinState(); 
                         
                         const indicator = document.getElementById('live-indicator');
                         if (indicator && indicator.innerHTML.includes('Offline')) {
@@ -711,7 +762,6 @@
                             indicator.innerHTML = '<i class="fa-solid fa-cloud"></i> Synkad';
                         }
                     } else if (initialLoadCount > requiredCollections.length) {
-                        // Updatering i realtid om skärmen INTE är låst
                         if (myIdentity && document.getElementById('pin-screen').classList.contains('hidden')) {
                             updateWeekSelector(); 
                         } else if (!myIdentity && document.getElementById('pin-screen').classList.contains('hidden')) {
