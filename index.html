@@ -33,9 +33,20 @@
 </head>
 <body class="h-screen flex flex-col font-sans text-gray-800 relative max-w-4xl mx-auto shadow-xl bg-white sm:border-x sm:border-gray-200">
 
-    <!-- Notis-Toast (Används för In-App notiser) -->
-    <div id="toast" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-full shadow-xl transition-opacity duration-300 opacity-0 pointer-events-none z-[400] text-sm font-bold flex items-center">
-        <i class="fa-solid fa-circle-info mr-2 text-blue-400"></i> <span id="toast-msg">Meddelande</span>
+    <!-- Notis-Toast (Bredare, mjukt rektangulär och placerad i botten) -->
+    <div id="toast" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-11/12 max-w-sm bg-gray-900 text-white p-4 rounded-xl shadow-2xl transition-all duration-300 opacity-0 pointer-events-none translate-y-4 z-[400] border border-gray-700 flex flex-col gap-3">
+        <div class="flex items-start">
+            <div class="bg-blue-500/20 p-2 rounded-lg mr-3 text-blue-400 flex-shrink-0">
+                <i class="fa-solid fa-bell text-xl"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-sm">Schema uppdaterat!</h3>
+                <p id="toast-msg" class="text-xs text-gray-300 mt-0.5 leading-snug">Meddelande här</p>
+            </div>
+        </div>
+        <button id="toast-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-lg text-sm transition-colors shadow-sm pointer-events-auto active:scale-95">
+            Ladda in nya tider
+        </button>
     </div>
 
     <!-- LÅSSKÄRM (PIN-KOD) -->
@@ -153,11 +164,22 @@
 
     <!-- Huvudlogik -->
     <script>
+        // NY KOD: Flagga för att lysa upp korten
+        let pendingHighlight = false;
+
         function showUiToast(msg) {
             const toast = document.getElementById('toast');
             document.getElementById('toast-msg').innerText = msg;
-            toast.classList.remove('opacity-0');
-            setTimeout(() => toast.classList.add('opacity-0'), 6000);
+            
+            // Visa notisen
+            toast.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-4');
+            
+            // Vad som händer när man klickar på "Ladda in nya tider"
+            document.getElementById('toast-btn').onclick = () => {
+                toast.classList.add('opacity-0', 'pointer-events-none', 'translate-y-4');
+                pendingHighlight = true; // Sätt flaggan att vi ska animera passen!
+                updateWeekSelector();    // Hämta in datan och rita upp skärmen igen
+            };
         }
 
         const daysMap = { 'mon': 'Måndag', 'tue': 'Tisdag', 'wed': 'Onsdag', 'thu': 'Torsdag', 'fri': 'Fredag', 'sat': 'Lördag', 'sun': 'Söndag' };
@@ -497,6 +519,9 @@
 
             myPasses.sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
 
+            // NY KOD: Bestämmer om korten ska blinka/lysa efter kvittering
+            let glowClass = pendingHighlight ? 'ring-[3px] ring-green-400 scale-[1.01] shadow-lg transition-all duration-700 ease-out z-10' : 'transition-all duration-300';
+
             let shiftsHtml = '';
             myPasses.forEach(pass => {
                 let dateStr = pass.dateObj.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' });
@@ -520,7 +545,7 @@
                 let timeStr = formatShiftTime(pass.startTime, pass.endTime, pass.daySpan);
 
                 shiftsHtml += `
-                    <div class="bg-white rounded-xl shadow-sm border ${pass.isBorrowed ? 'border-teal-300 border-l-4 border-l-teal-500' : 'border-gray-200 border-l-4 border-l-blue-500'} p-4 transition-all mb-3">
+                    <div class="shift-card relative bg-white rounded-xl shadow-sm border ${pass.isBorrowed ? 'border-teal-300 border-l-4 border-l-teal-500' : 'border-gray-200 border-l-4 border-l-blue-500'} p-4 mb-3 ${glowClass}">
                         <div class="flex justify-between items-start mb-2">
                             <div>
                                 <div class="font-black ${dayColorClass} text-sm tracking-wide uppercase">${dayName} <span class="text-gray-400 ml-1 font-semibold">${dateStr}</span></div>
@@ -534,6 +559,16 @@
                 `;
             });
             container.innerHTML = shiftsHtml;
+
+            // NY KOD: Ta bort den gröna markeringen efter 5 sekunder
+            if (pendingHighlight) {
+                setTimeout(() => {
+                    document.querySelectorAll('.shift-card').forEach(card => {
+                        card.classList.remove('ring-[3px]', 'ring-green-400', 'scale-[1.01]', 'shadow-lg', 'z-10');
+                    });
+                    pendingHighlight = false; // Nollställ flaggan
+                }, 5000);
+            }
         }
 
         function renderGrid() {
@@ -567,29 +602,32 @@
             let mondayDate = getMondayOfISOWeek(week, year);
 
             const activeNeedsIds = Object.keys(pubDoc.data);
-        const activeNeeds = state.needs.filter(n => activeNeedsIds.includes(n.id)).sort((a,b) => (a.sortOrder||0)-(b.sortOrder||0));
+            const activeNeeds = state.needs.filter(n => activeNeedsIds.includes(n.id)).sort((a,b) => (a.sortOrder||0)-(b.sortOrder||0));
 
-        const myStaffId = myIdentity ? myIdentity.staffId : null;
+            const myStaffId = myIdentity ? myIdentity.staffId : null;
 
-        // PRECALCULATE DAY METADATA FOR RED DAYS
-        const dayMeta = {};
-        order.forEach(day => {
-            let d = new Date(mondayDate); d.setDate(d.getDate() + (order.indexOf(day)));
-            if(weekStart==='sun' && day==='sun') { d = new Date(mondayDate); d.setDate(d.getDate()-1); }
-            let y = d.getFullYear();
-            let m = String(d.getMonth() + 1).padStart(2, '0');
-            let dt = String(d.getDate()).padStart(2, '0');
-            let isoDateStr = `${y}-${m}-${dt}`;
-            let holiday = getSwedishHoliday(isoDateStr);
-            dayMeta[day] = {
-                dateObj: d,
-                isRedDay: holiday || day === 'sun',
-                holidayName: holiday
-            };
-        });
+            // PRECALCULATE DAY METADATA FOR RED DAYS
+            const dayMeta = {};
+            order.forEach(day => {
+                let d = new Date(mondayDate); d.setDate(d.getDate() + (order.indexOf(day)));
+                if(weekStart==='sun' && day==='sun') { d = new Date(mondayDate); d.setDate(d.getDate()-1); }
+                let y = d.getFullYear();
+                let m = String(d.getMonth() + 1).padStart(2, '0');
+                let dt = String(d.getDate()).padStart(2, '0');
+                let isoDateStr = `${y}-${m}-${dt}`;
+                let holiday = getSwedishHoliday(isoDateStr);
+                dayMeta[day] = {
+                    dateObj: d,
+                    isRedDay: holiday || day === 'sun',
+                    holidayName: holiday
+                };
+            });
 
-        const generateCellHtml = (assignments, hc) => {
-            let displayList = [];
+            // NY KOD: Lägg till glow-effekt på rutorna i grid-vyn också om det behövs
+            let glowClassGrid = pendingHighlight ? 'ring-[2px] ring-green-400 scale-[1.05] z-10 transition-all duration-700' : '';
+
+            const generateCellHtml = (assignments, hc) => {
+                let displayList = [];
                 for(let i = 0; i < hc; i++) {
                     const sId = assignments[i];
                     let sName = "-";
@@ -605,7 +643,8 @@
                             if (isBorrowed) sName = `🤝 ${sName}`;
                             
                             if (sId === myStaffId) {
-                                styling = "grid-cell-highlight text-blue-900 font-bold border-blue-400";
+                                // Om detta pass är M립니다s pass och vi har klickat på kvittera: Lägg på den gröna ramen!
+                                styling = `grid-cell-highlight text-blue-900 font-bold border-blue-400 grid-shift-me ${glowClassGrid}`;
                                 isMe = true;
                             } else {
                                 styling = "bg-white text-gray-800 border-gray-300 shadow-sm"; 
@@ -635,114 +674,124 @@
                 }
 
                 if (displayList.length > MAX_VISIBLE) {
-                const extraCount = displayList.length - MAX_VISIBLE;
-                html += `<button onclick="toggleExpand(this)" class="text-[9px] text-blue-500 font-bold text-center mt-0.5 hover:text-blue-700 bg-blue-50 py-0.5 rounded border border-blue-100 transition-colors">+ ${extraCount} till</button>`;
-            }
-            html += `</div>`;
-            return html;
-        };
+                    const extraCount = displayList.length - MAX_VISIBLE;
+                    html += `<button onclick="toggleExpand(this)" class="text-[9px] text-blue-500 font-bold text-center mt-0.5 hover:text-blue-700 bg-blue-50 py-0.5 rounded border border-blue-100 transition-colors">+ ${extraCount} till</button>`;
+                }
+                html += `</div>`;
+                return html;
+            };
 
-        if (layout === 'transposed') {
-            let trHead = document.createElement('tr');
-            trHead.innerHTML = `<th class="px-3 py-2 text-left font-bold sticky-col sticky-col-top bg-gray-100 w-32 border-b-2 border-r-2 border-gray-200">Behov / Rutt</th>`;
-            order.forEach(day => {
-                const meta = dayMeta[day];
-                let dayColor = meta.isRedDay ? 'text-red-600' : 'text-gray-800';
-                let bgClass = meta.isRedDay ? 'bg-red-50' : 'bg-gray-100';
-                let dateColor = meta.isRedDay ? 'text-red-500' : 'text-blue-600';
-                let holidayTag = meta.holidayName ? `<div class="text-[10px] text-red-600 font-bold mt-0.5 leading-tight">${meta.holidayName}</div>` : '';
-                
-                trHead.innerHTML += `<th class="px-3 py-2 text-left font-bold sticky-col-top border-b-2 border-r-2 border-gray-200 min-w-[120px] ${bgClass}">
-                    <div class="${dayColor} text-xs">${daysMap[day]}</div>
-                    <div class="text-xs ${dateColor}">${meta.dateObj.toLocaleDateString('sv-SE', {day:'numeric',month:'numeric'})}</div>
-                    ${holidayTag}
-                </th>`;
-            });
-            thead.appendChild(trHead);
-
-            activeNeeds.forEach(need => {
-                let tr = document.createElement('tr');
-                tr.className = "border-b border-gray-200";
-                
-                let hcText = need.headcount > 1 ? `<span class="bg-blue-100 text-blue-800 text-[9px] px-1 rounded ml-1">x${need.headcount}</span>` : '';
-                
-                tr.innerHTML = `<th class="p-2 text-left sticky-col bg-gray-50 border-r-2 border-gray-200 align-top z-20">
-                    <div class="font-bold text-gray-800 text-[11px] leading-tight">${need.title} ${hcText}</div>
-                    <div class="text-[10px] text-gray-500 font-normal mt-0.5">${formatShiftTime(need.startTime, need.endTime, need.daySpan)}</div>
-                </th>`;
-
+            if (layout === 'transposed') {
+                let trHead = document.createElement('tr');
+                trHead.innerHTML = `<th class="px-3 py-2 text-left font-bold sticky-col sticky-col-top bg-gray-100 w-32 border-b-2 border-r-2 border-gray-200">Behov / Rutt</th>`;
                 order.forEach(day => {
-                    const assignments = pubDoc.data[need.id][day] || [];
-                    const hc = need.headcount || 1;
-                    const isRed = dayMeta[day].isRedDay;
-                    const cellBg = isRed ? 'bg-red-50/40' : 'bg-white';
+                    const meta = dayMeta[day];
+                    let dayColor = meta.isRedDay ? 'text-red-600' : 'text-gray-800';
+                    let bgClass = meta.isRedDay ? 'bg-red-50' : 'bg-gray-100';
+                    let dateColor = meta.isRedDay ? 'text-red-500' : 'text-blue-600';
+                    let holidayTag = meta.holidayName ? `<div class="text-[10px] text-red-600 font-bold mt-0.5 leading-tight">${meta.holidayName}</div>` : '';
                     
-                    let cellHtml = `<td class="p-1 border-r border-gray-200 align-top ${cellBg}">`;
-                    
-                    if (need.activeDays.includes(day)) {
-                        cellHtml += generateCellHtml(assignments, hc);
-                    } else {
-                        cellHtml += `<div class="text-center text-gray-200 text-[10px]">-</div>`;
-                    }
-                    
-                    cellHtml += `</td>`;
-                    tr.innerHTML += cellHtml;
+                    trHead.innerHTML += `<th class="px-3 py-2 text-left font-bold sticky-col-top border-b-2 border-r-2 border-gray-200 min-w-[120px] ${bgClass}">
+                        <div class="${dayColor} text-xs">${daysMap[day]}</div>
+                        <div class="text-xs ${dateColor}">${meta.dateObj.toLocaleDateString('sv-SE', {day:'numeric',month:'numeric'})}</div>
+                        ${holidayTag}
+                    </th>`;
                 });
-                tbody.appendChild(tr);
-            });
+                thead.appendChild(trHead);
 
-        } else {
-            let trHead = document.createElement('tr');
-            trHead.innerHTML = `<th class="px-3 py-2 text-left font-bold sticky-col sticky-col-top bg-gray-100 w-24 border-b-2 border-r-2 border-gray-200">Dag</th>`;
-            
-            activeNeeds.forEach(need => {
-                let hcText = need.headcount > 1 ? `<span class="bg-blue-100 text-blue-800 text-[9px] px-1 rounded ml-1">x${need.headcount}</span>` : '';
-                trHead.innerHTML += `
-                    <th class="p-2 text-left border-r-2 border-b-2 border-gray-200 bg-gray-100 sticky-col-top align-top shadow-sm min-w-[100px]">
+                activeNeeds.forEach(need => {
+                    let tr = document.createElement('tr');
+                    tr.className = "border-b border-gray-200";
+                    
+                    let hcText = need.headcount > 1 ? `<span class="bg-blue-100 text-blue-800 text-[9px] px-1 rounded ml-1">x${need.headcount}</span>` : '';
+                    
+                    tr.innerHTML = `<th class="p-2 text-left sticky-col bg-gray-50 border-r-2 border-gray-200 align-top z-20">
                         <div class="font-bold text-gray-800 text-[11px] leading-tight">${need.title} ${hcText}</div>
                         <div class="text-[10px] text-gray-500 font-normal mt-0.5">${formatShiftTime(need.startTime, need.endTime, need.daySpan)}</div>
                     </th>`;
-            });
-            thead.appendChild(trHead);
 
-            order.forEach(day => {
-                const meta = dayMeta[day];
-                let trDay = document.createElement('tr');
-                trDay.className = "border-b border-gray-200";
-                
-                let dayColor = meta.isRedDay ? 'text-red-600' : 'text-gray-800';
-                let dateColor = meta.isRedDay ? 'text-red-500' : 'text-blue-600';
-                let holidayTag = meta.holidayName ? `<div class="text-[10px] text-red-600 font-bold mt-0.5 leading-tight">${meta.holidayName}</div>` : '';
-                let thBg = meta.isRedDay ? 'bg-red-50' : 'bg-gray-50';
-
-                trDay.innerHTML = `<td class="px-2 py-2 font-semibold sticky-col border-r-2 border-gray-200 ${thBg} z-20">
-                    <div class="${dayColor} text-[11px]">${daysMap[day]}</div>
-                    <div class="text-[10px] ${dateColor}">${meta.dateObj.toLocaleDateString('sv-SE', {day:'numeric',month:'numeric'})}</div>
-                    ${holidayTag}
-                </td>`;
-
-                activeNeeds.forEach(need => {
-                    const assignments = pubDoc.data[need.id][day] || [];
-                    const hc = need.headcount || 1;
-                    const cellBg = meta.isRedDay ? 'bg-red-50/40' : 'bg-white';
-                    
-                    let cellHtml = `<td class="p-1 border-r border-gray-200 align-top ${cellBg}">`;
-                    
-                    if (need.activeDays.includes(day)) {
-                        cellHtml += generateCellHtml(assignments, hc);
-                    } else {
-                        cellHtml += `<div class="text-center text-gray-200 text-[10px]">-</div>`;
-                    }
-                    
-                    cellHtml += `</td>`;
-                    trDay.innerHTML += cellHtml;
+                    order.forEach(day => {
+                        const assignments = pubDoc.data[need.id][day] || [];
+                        const hc = need.headcount || 1;
+                        const isRed = dayMeta[day].isRedDay;
+                        const cellBg = isRed ? 'bg-red-50/40' : 'bg-white';
+                        
+                        let cellHtml = `<td class="p-1 border-r border-gray-200 align-top ${cellBg}">`;
+                        
+                        if (need.activeDays.includes(day)) {
+                            cellHtml += generateCellHtml(assignments, hc);
+                        } else {
+                            cellHtml += `<div class="text-center text-gray-200 text-[10px]">-</div>`;
+                        }
+                        
+                        cellHtml += `</td>`;
+                        tr.innerHTML += cellHtml;
+                    });
+                    tbody.appendChild(tr);
                 });
-                tbody.appendChild(trDay);
-            });
-        }
-    }
 
-    function switchTab(tabId) {
+            } else {
+                let trHead = document.createElement('tr');
+                trHead.innerHTML = `<th class="px-3 py-2 text-left font-bold sticky-col sticky-col-top bg-gray-100 w-24 border-b-2 border-r-2 border-gray-200">Dag</th>`;
+                
+                activeNeeds.forEach(need => {
+                    let hcText = need.headcount > 1 ? `<span class="bg-blue-100 text-blue-800 text-[9px] px-1 rounded ml-1">x${need.headcount}</span>` : '';
+                    trHead.innerHTML += `
+                        <th class="p-2 text-left border-r-2 border-b-2 border-gray-200 bg-gray-100 sticky-col-top align-top shadow-sm min-w-[100px]">
+                            <div class="font-bold text-gray-800 text-[11px] leading-tight">${need.title} ${hcText}</div>
+                            <div class="text-[10px] text-gray-500 font-normal mt-0.5">${formatShiftTime(need.startTime, need.endTime, need.daySpan)}</div>
+                        </th>`;
+                });
+                thead.appendChild(trHead);
+
+                order.forEach(day => {
+                    const meta = dayMeta[day];
+                    let trDay = document.createElement('tr');
+                    trDay.className = "border-b border-gray-200";
+                    
+                    let dayColor = meta.isRedDay ? 'text-red-600' : 'text-gray-800';
+                    let dateColor = meta.isRedDay ? 'text-red-500' : 'text-blue-600';
+                    let holidayTag = meta.holidayName ? `<div class="text-[10px] text-red-600 font-bold mt-0.5 leading-tight">${meta.holidayName}</div>` : '';
+                    let thBg = meta.isRedDay ? 'bg-red-50' : 'bg-gray-50';
+
+                    trDay.innerHTML = `<td class="px-2 py-2 font-semibold sticky-col border-r-2 border-gray-200 ${thBg} z-20">
+                        <div class="${dayColor} text-[11px]">${daysMap[day]}</div>
+                        <div class="text-[10px] ${dateColor}">${meta.dateObj.toLocaleDateString('sv-SE', {day:'numeric',month:'numeric'})}</div>
+                        ${holidayTag}
+                    </td>`;
+
+                    activeNeeds.forEach(need => {
+                        const assignments = pubDoc.data[need.id][day] || [];
+                        const hc = need.headcount || 1;
+                        const cellBg = meta.isRedDay ? 'bg-red-50/40' : 'bg-white';
+                        
+                        let cellHtml = `<td class="p-1 border-r border-gray-200 align-top ${cellBg}">`;
+                        
+                        if (need.activeDays.includes(day)) {
+                            cellHtml += generateCellHtml(assignments, hc);
+                        } else {
+                            cellHtml += `<div class="text-center text-gray-200 text-[10px]">-</div>`;
+                        }
+                        
+                        cellHtml += `</td>`;
+                        trDay.innerHTML += cellHtml;
+                    });
+                    tbody.appendChild(trDay);
+                });
+            }
+
+            // NY KOD: Rensa highlight även från griden
+            if (pendingHighlight) {
+                setTimeout(() => {
+                    document.querySelectorAll('.grid-shift-me').forEach(card => {
+                        card.classList.remove('ring-[2px]', 'ring-green-400', 'scale-[1.05]', 'z-10');
+                    });
+                    pendingHighlight = false;
+                }, 5000);
+            }
+        }
+
+        function switchTab(tabId) {
             ['tab-my-shifts', 'tab-grid'].forEach(id => {
                 document.getElementById(id).classList.add('hidden');
                 const btn = document.getElementById(`btn-${id}`);
@@ -871,8 +920,9 @@
                         const job = change.doc.data();
                         if (Date.now() - job.createdAt < 60000) { 
                             if (myIdentity && job.staffIds.includes(myIdentity.staffId)) {
-                                showUiToast("🔔 " + job.title + " - " + job.body);
-                                updateWeekSelector(); 
+                                // NY KOD: Vi uppdaterar inte skärmen automatiskt längre.
+                                // Vi visar bara rutan, och väntar på kvitteringen!
+                                showUiToast(job.body);
                             }
                         }
                     }
