@@ -33,6 +33,22 @@
 </head>
 <body class="h-screen flex flex-col font-sans text-gray-800 relative max-w-4xl mx-auto shadow-xl bg-white sm:border-x sm:border-gray-200">
 
+    <!-- DATABAS-MÄTARE (FELSÖKNING) -->
+    <div id="db-counter-widget" class="fixed bottom-4 right-4 bg-gray-900/95 text-white p-3 rounded-xl shadow-2xl z-[9999] border border-gray-700 text-xs font-mono backdrop-blur-md transition-all">
+        <div class="flex justify-between items-center border-b border-gray-700 pb-2 mb-2">
+            <span class="font-bold text-gray-300"><i class="fa-solid fa-server mr-1"></i> DB Trafik</span>
+            <button onclick="resetDbCounters()" class="text-red-400 hover:text-red-300 bg-red-400/10 px-2 py-0.5 rounded ml-4 transition-colors">Nollställ</button>
+        </div>
+        <div class="flex justify-between items-center gap-6 mb-1">
+            <span class="text-gray-400">Läsningar:</span>
+            <span id="debug-reads" class="text-blue-400 font-bold text-sm">0</span>
+        </div>
+        <div class="flex justify-between items-center gap-6">
+            <span class="text-gray-400">Skrivningar:</span>
+            <span id="debug-writes" class="text-green-400 font-bold text-sm">0</span>
+        </div>
+    </div>
+
     <!-- FULLSKÄRMS-NOTIS FÖR UPPDATERINGAR -->
     <div id="update-overlay" class="fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-[500] flex items-center justify-center p-6 hidden opacity-0 transition-opacity duration-300">
         <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8 text-center transform scale-95 transition-transform duration-300" id="update-content">
@@ -161,8 +177,43 @@
         </main>
     </div>
 
-    <!-- Huvudlogik -->
+    <!-- DB TRACKER & HUVUDLOGIK -->
     <script>
+        // --- MÄTARE FÖR LÄSNINGAR OCH SKRIVNINGAR ---
+        window.dbReads = parseInt(localStorage.getItem('debug_db_reads') || '0');
+        window.dbWrites = parseInt(localStorage.getItem('debug_db_writes') || '0');
+
+        window.updateDbUI = function() {
+            const rEl = document.getElementById('debug-reads');
+            const wEl = document.getElementById('debug-writes');
+            if(rEl) rEl.innerText = window.dbReads.toLocaleString('sv-SE');
+            if(wEl) wEl.innerText = window.dbWrites.toLocaleString('sv-SE');
+        };
+
+        window.trackFbRead = function(count = 1) {
+            window.dbReads += count;
+            localStorage.setItem('debug_db_reads', window.dbReads);
+            window.updateDbUI();
+        };
+
+        window.trackFbWrite = function(count = 1) {
+            window.dbWrites += count;
+            localStorage.setItem('debug_db_writes', window.dbWrites);
+            window.updateDbUI();
+        };
+
+        window.resetDbCounters = function() {
+            window.dbReads = 0;
+            window.dbWrites = 0;
+            localStorage.setItem('debug_db_reads', 0);
+            localStorage.setItem('debug_db_writes', 0);
+            window.updateDbUI();
+        };
+
+        // Initiera UI för mätaren
+        document.addEventListener('DOMContentLoaded', window.updateDbUI);
+
+        // --- SCHEMALÄSARENS BEFINTLIGA KOD ---
         let pendingHighlight = false;
 
         function showUpdateScreen(job) {
@@ -845,7 +896,7 @@
         }
     </script>
 
-    <!-- FIREBASE SYNC (ENDAST IN-APP NOTISER OCH SMART MINNE) -->
+    <!-- FIREBASE SYNC MED UPPKOPPLING TILL MÄTAREN -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -906,6 +957,11 @@
             if (!user) return;
 
             onSnapshot(doc(db, 'artifacts', artifactAppId, 'public', 'data', 'settings', 'global'), (docSnap) => {
+                // NYTT: Kontrollera om datan kom från servern, i så fall ticka mätaren!
+                if (!docSnap.metadata.fromCache) {
+                    window.trackFbRead(1); 
+                }
+
                 if (docSnap.exists()) {
                     const data = docSnap.data();
                     if(data.currentYear) state.settings = { ...state.settings, currentYear: data.currentYear };
@@ -922,6 +978,11 @@
             requiredCollections.forEach(colName => {
                 onSnapshot(collection(db, 'artifacts', artifactAppId, 'public', 'data', colName), (snapshot) => {
                     
+                    // NYTT: Räkna bara läsningar om datan INTE kommer från den lokala cachen
+                    if (!snapshot.metadata.fromCache) {
+                        window.trackFbRead(snapshot.docChanges().length);
+                    }
+
                     snapshot.docChanges().forEach((change) => {
                         const data = change.doc.data();
                         if (change.type === "added" || change.type === "modified") {
@@ -939,9 +1000,7 @@
                         checkPinState(); 
                     } else if (initialLoadCount > requiredCollections.length) {
                         if (myIdentity && document.getElementById('pin-screen').classList.contains('hidden')) {
-                            // Vi uppdaterar bara klockan/schemat tyst om vi EJ väntar på kvittering
                             if (!document.getElementById('update-overlay').classList.contains('hidden')) {
-                                // Användaren kollar på uppdateringsskärmen, pausa!
                             } else {
                                 updateWeekSelector(); 
                             }
@@ -953,6 +1012,10 @@
             });
 
             onSnapshot(collection(db, 'artifacts', artifactAppId, 'public', 'data', 'push_jobs'), (snapshot) => {
+                if (!snapshot.metadata.fromCache) {
+                    window.trackFbRead(snapshot.docChanges().length);
+                }
+
                 snapshot.docChanges().forEach((change) => {
                     if (change.type === "added") {
                         const job = change.doc.data();
