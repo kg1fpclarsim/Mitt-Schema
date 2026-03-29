@@ -265,8 +265,14 @@
         let state = { settings: {}, schedules: [], staff: [], needs: [], published_schedules: [] };
 
         let myIdentity = JSON.parse(localStorage.getItem('schemavisare_user')) || null;
+        let unlockedCompanyId = localStorage.getItem('schemavisare_company') || null;
         let activeWeekStr = null; 
         let availableWeeks = [];
+
+        function getVisibleSchedules() {
+            if (unlockedCompanyId === 'all' || !unlockedCompanyId) return state.schedules;
+            return state.schedules.filter(s => s.companyId === unlockedCompanyId);
+        }
 
         function getWeekNumber(d) {
             d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -367,15 +373,27 @@
             }
         };
 
-        function checkPinState() {
-            const requiredPin = state.settings.viewerPin;
-            const savedPin = localStorage.getItem('schemavisare_pin');
+       function checkPinState() {
+            const pins = state.settings.viewerPins || {};
+            const activePins = Object.entries(pins).filter(([compId, pin]) => pin && pin.trim() !== '');
 
-            if (requiredPin && requiredPin.trim() !== '' && requiredPin !== savedPin) {
-                document.getElementById('pin-screen').classList.remove('hidden');
-                document.getElementById('identity-screen').classList.add('hidden');
-                document.getElementById('main-app').classList.add('hidden');
+            if (activePins.length > 0) {
+                const savedPin = localStorage.getItem('schemavisare_pin');
+                const matchedCompany = activePins.find(([compId, pin]) => pin === savedPin);
+
+                if (matchedCompany) {
+                    unlockedCompanyId = matchedCompany[0];
+                    localStorage.setItem('schemavisare_company', unlockedCompanyId);
+                    document.getElementById('pin-screen').classList.add('hidden');
+                    checkIdentityState();
+                } else {
+                    document.getElementById('pin-screen').classList.remove('hidden');
+                    document.getElementById('identity-screen').classList.add('hidden');
+                    document.getElementById('main-app').classList.add('hidden');
+                }
             } else {
+                unlockedCompanyId = 'all';
+                localStorage.removeItem('schemavisare_company');
                 document.getElementById('pin-screen').classList.add('hidden');
                 checkIdentityState();
             }
@@ -383,10 +401,14 @@
 
         function verifyPin() {
             const input = document.getElementById('pin-input').value.trim();
-            const requiredPin = state.settings.viewerPin;
+            const pins = state.settings.viewerPins || {};
+            const activePins = Object.entries(pins).filter(([compId, pin]) => pin && pin.trim() !== '');
 
-            if (input === requiredPin) {
+            const matchedCompany = activePins.find(([compId, pin]) => pin === input);
+
+            if (matchedCompany) {
                 localStorage.setItem('schemavisare_pin', input);
+                localStorage.setItem('schemavisare_company', matchedCompany[0]);
                 document.getElementById('pin-error').classList.add('hidden');
                 document.getElementById('pin-input').value = '';
                 checkPinState(); 
@@ -414,11 +436,11 @@
                 updateWeekSelector();
             }
         }
-
-        function renderIdentityDropdowns() {
+function renderIdentityDropdowns() {
             const deptSelect = document.getElementById('id-department');
             let optionsHtml = '<option value="">-- Välj avdelning --</option>';
-            state.schedules.forEach(sch => {
+            const visibleSchedules = getVisibleSchedules();
+            visibleSchedules.forEach(sch => {
                 optionsHtml += `<option value="${sch.id}">${sch.name}</option>`;
             });
             deptSelect.innerHTML = optionsHtml;
@@ -467,9 +489,14 @@
         function resetIdentity() {
             myIdentity = null;
             localStorage.removeItem('schemavisare_user');
+            localStorage.removeItem('schemavisare_pin');
+            localStorage.removeItem('schemavisare_company');
+            document.getElementById('grid-department-selector').innerHTML = '';
             switchTab('tab-my-shifts');
-            checkIdentityState();
+            checkPinState();
         }
+
+        
 
         function updateWeekSelector() {
             const today = new Date();
@@ -514,11 +541,12 @@
             const gridDeptSelect = document.getElementById('grid-department-selector');
             if (gridDeptSelect.options.length <= 0 && state.schedules.length > 0) {
                 let deptOptions = '';
-                state.schedules.forEach(sch => {
+                const visibleSchedules = getVisibleSchedules();
+                visibleSchedules.forEach(sch => {
                     deptOptions += `<option value="${sch.id}">${sch.name}</option>`;
                 });
                 gridDeptSelect.innerHTML = deptOptions;
-                if (myIdentity && state.schedules.some(s => s.id === myIdentity.departmentId)) {
+                if (myIdentity && visibleSchedules.some(s => s.id === myIdentity.departmentId)) {
                     gridDeptSelect.value = myIdentity.departmentId;
                 }
             }
@@ -962,12 +990,18 @@
                     window.trackFbRead(1); 
                 }
 
-                if (docSnap.exists()) {
+               if (docSnap.exists()) {
                     const data = docSnap.data();
                     if(data.currentYear) state.settings = { ...state.settings, currentYear: data.currentYear };
                     
-                    if(data.viewerPin !== undefined) {
-                        state.settings.viewerPin = data.viewerPin;
+                    if (data.viewerPins !== undefined) {
+                        state.settings.viewerPins = data.viewerPins;
+                        if (initialLoadCount >= requiredCollections.length) {
+                            checkPinState(); 
+                        }
+                    } else if (data.viewerPin !== undefined) {
+                        // Fallback om databasen inte hunnit synka nya strukturen
+                        state.settings.viewerPins = { 'bolag_1': data.viewerPin };
                         if (initialLoadCount >= requiredCollections.length) {
                             checkPinState(); 
                         }
