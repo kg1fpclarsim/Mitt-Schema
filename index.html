@@ -34,7 +34,7 @@
 <body class="h-screen flex flex-col font-sans text-gray-800 relative max-w-4xl mx-auto shadow-xl bg-white sm:border-x sm:border-gray-200">
 
     <!-- DATABAS-MÄTARE (FELSÖKNING) -->
-    <div id="db-counter-widget" class="fixed bottom-4 right-4 bg-gray-900/95 text-white p-3 rounded-xl shadow-2xl z-[9999] border border-gray-700 text-xs font-mono backdrop-blur-md transition-all">
+    <div id="db-counter-widget" class="hidden fixed bottom-4 right-4 bg-gray-900/95 text-white p-3 rounded-xl shadow-2xl z-[9999] border border-gray-700 text-xs font-mono backdrop-blur-md transition-all">
         <div class="flex justify-between items-center border-b border-gray-700 pb-2 mb-2">
             <span class="font-bold text-gray-300"><i class="fa-solid fa-server mr-1"></i> DB Trafik</span>
             <button onclick="resetDbCounters()" class="text-red-400 hover:text-red-300 bg-red-400/10 px-2 py-0.5 rounded ml-4 transition-colors">Nollställ</button>
@@ -70,7 +70,7 @@
             <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-red-50 text-red-600 mb-6">
                 <i class="fa-solid fa-lock text-3xl"></i>
             </div>
-            <h1 class="text-2xl font-black text-gray-900 mb-2">Låst Schema</h1>
+            <h1 class="text-2xl font-black text-gray-900 mb-2 cursor-pointer" onclick="handleSecretTap()">Låst Schema</h1>
             <p class="text-gray-500 mb-8 text-sm font-medium">Ange företagets inloggningskod för att kunna se planeringen.</p>
             
             <input type="password" id="pin-input" onkeydown="if(event.key === 'Enter') verifyPin()" class="w-full border-2 border-gray-200 rounded-xl p-4 text-center text-3xl tracking-[0.5em] font-black mb-4 focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all" placeholder="••••">
@@ -120,7 +120,7 @@
         <header id="main-header" class="bg-blue-600 text-white shadow-md z-20 shrink-0 pb-1 transition-all duration-300">
             <div id="header-top-row" class="px-4 pt-4 pb-2 flex justify-between items-start transition-all duration-300">
                 <div id="header-brand-area" class="transition-all duration-300 overflow-hidden transform origin-left">
-                    <h1 class="text-xl font-extrabold tracking-tight">Mitt Schema</h1>
+                    <h1 class="text-xl font-extrabold tracking-tight cursor-pointer" onclick="handleSecretTap()">Mitt Schema</h1>
                     <div class="text-blue-100 text-sm font-medium flex items-center mt-0.5 cursor-pointer hover:text-white" onclick="resetIdentity()" title="Klicka för att byta person">
                         <i class="fa-solid fa-user text-xs mr-1.5 opacity-80"></i> <span id="user-name-display" class="underline decoration-blue-400 underline-offset-2">Laddar...</span>
                     </div>
@@ -210,8 +210,36 @@
             window.updateDbUI();
         };
 
-        // Initiera UI för mätaren
-        document.addEventListener('DOMContentLoaded', window.updateDbUI);
+        // --- HEMLIGT UTVECKLARLÄGE (Klicka 5 gånger) ---
+        let secretTapCount = 0;
+        let secretTapTimer = null;
+        window.handleSecretTap = function() {
+            secretTapCount++;
+            clearTimeout(secretTapTimer);
+            // Om man inte klickar igen inom 1 sekund nollställs räknaren
+            secretTapTimer = setTimeout(() => { secretTapCount = 0; }, 1000);
+            
+            if (secretTapCount >= 5) {
+                const widget = document.getElementById('db-counter-widget');
+                if (widget.classList.contains('hidden')) {
+                    widget.classList.remove('hidden');
+                    localStorage.setItem('show_debug_counter', 'true');
+                } else {
+                    widget.classList.add('hidden');
+                    localStorage.removeItem('show_debug_counter');
+                }
+                secretTapCount = 0; // Nollställ för nästa gång
+            }
+        };
+
+        // Initiera UI för mätaren och kom ihåg om den var framme sist
+        document.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('show_debug_counter') === 'true') {
+                const widget = document.getElementById('db-counter-widget');
+                if(widget) widget.classList.remove('hidden');
+            }
+            window.updateDbUI();
+        });
 
         // --- SCHEMALÄSARENS BEFINTLIGA KOD ---
         let pendingHighlight = false;
@@ -505,10 +533,15 @@ function renderIdentityDropdowns() {
             const threshold = currentYr * 100 + currentWk; 
 
             const weekSet = new Set();
+            const visibleSchedules = getVisibleSchedules().map(s => s.id);
+            
             state.published_schedules.forEach(pub => {
-                const val = pub.year * 100 + pub.week;
-                if (val >= threshold) {
-                    weekSet.add(pub.year + "_" + pub.week);
+                // Visa bara veckan i listan om den tillhör en avdelning i inloggat bolag
+                if (visibleSchedules.includes(pub.scheduleId)) {
+                    const val = pub.year * 100 + pub.week;
+                    if (val >= threshold) {
+                        weekSet.add(pub.year + "_" + pub.week);
+                    }
                 }
             });
 
